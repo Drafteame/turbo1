@@ -7,18 +7,24 @@ import type {
 import type { Selection } from './types';
 
 /**
- * ONE CLICK BET SESSION — the single authoritative gesture/entry-creation
- * state machine for Quick Bet long-press. Replaces the three independent
- * `useLongPress` instances that used to live in HomeScreen.tsx (PromoCarousel,
- * MarketAccordion × 2) — this hook is mounted ONCE (in App.tsx) and its
- * `bind`/`cancelActive` API is prop-drilled down to every pick surface, so
- * there is exactly one in-flight hold/timer/entry-creation sequence at a
- * time, no matter how many pick buttons exist.
+ * ONE CLICK BET SESSION — the single authoritative long-press gesture state
+ * machine for Quick Bet. Replaces the three independent `useLongPress`
+ * instances that used to live in HomeScreen.tsx (PromoCarousel, MarketAccordion
+ * × 2) — this hook is mounted ONCE (in App.tsx) and its `bind`/`cancelActive`
+ * API is prop-drilled down to every pick surface, so there is exactly one
+ * in-flight hold at a time, no matter how many pick buttons exist.
+ *
+ * IMPORTANT — a completed hold only TOGGLES the pick's normal selection
+ * state (via `onAccept`, same rules as a tap). It never creates an entry by
+ * itself: an entry requires at least `slipEntry.minSelections` (2) picks
+ * (see buttonProgressionConfig.ts), placed only through the normal
+ * swipe-to-confirm flow. This is a faster way to select, not a bypass of
+ * the slip.
  *
  * Selections only report input (bind) and consume whether they're the
  * active pressed one — they don't own progress or phase. The floating pill
- * (OneClickBetPill) consumes `session.progress`/`phase`/`odds`/`amount`/
- * `potentialWin` — it owns no timers either.
+ * (OneClickBetPill) consumes `session.progress`/`phase`/`odds` — it owns no
+ * timers either.
  */
 
 export type OcbPhase =
@@ -27,9 +33,7 @@ export type OcbPhase =
   | 'pressing' // engaged hold (> engageMs) — release cancels instead of tapping
   | 'reversing' // transient: released/interrupted mid-hold — pill stays visible, fill animates back to 0
   | 'exiting' // transient: fill has finished reversing to 0 — pill plays its squash/stretch exit before unmounting
-  | 'completed' // hold reached 1.0 this tick, gesture done, entry not yet started
-  | 'submitting' // async entry creation in flight
-  | 'success'; // entry created, success overlay playing
+  | 'completed'; // hold reached 1.0 this tick — the pick is now selected, pill about to dismiss
 
 export interface OneClickBetSessionState {
   phase: OcbPhase;
@@ -39,8 +43,6 @@ export interface OneClickBetSessionState {
   startX: number | null;
   startY: number | null;
   odds: number | null;
-  amount: number;
-  potentialWin: number | null;
   progress: number;
   holdStartedAt: number | null;
   movementCancelled: boolean;
@@ -48,7 +50,7 @@ export interface OneClickBetSessionState {
   pillVisible: boolean;
 }
 
-const idleState = (amount: number): OneClickBetSessionState => ({
+const idleState = (): OneClickBetSessionState => ({
   phase: 'idle',
   selectionId: null,
   matchId: null,
@@ -56,8 +58,6 @@ const idleState = (amount: number): OneClickBetSessionState => ({
   startX: null,
   startY: null,
   odds: null,
-  amount,
-  potentialWin: null,
   progress: 0,
   holdStartedAt: null,
   movementCancelled: false,
@@ -72,8 +72,6 @@ type Action =
       pointerId: number;
       x: number;
       y: number;
-      amount: number;
-      potentialWin: number;
       now: number;
     }
   | { type: 'TICK'; progress: number; phase: 'candidate' | 'pressing' }
@@ -81,8 +79,6 @@ type Action =
   | { type: 'REVERSE_TO_ZERO' }
   | { type: 'START_EXIT' }
   | { type: 'HOLD_COMPLETE' }
-  | { type: 'START_SUBMIT' }
-  | { type: 'SUBMIT_SUCCEEDED' }
   | { type: 'RESET' };
 
 function reducer(
@@ -92,7 +88,7 @@ function reducer(
   switch (action.type) {
     case 'PRESS_START':
       return {
-        ...idleState(action.amount),
+        ...idleState(),
         phase: 'candidate',
         selectionId: action.pick.id,
         matchId: action.pick.matchId,
@@ -100,7 +96,6 @@ function reducer(
         startX: action.x,
         startY: action.y,
         odds: action.pick.odds,
-        potentialWin: action.potentialWin,
         holdStartedAt: action.now,
       };
     case 'TICK':
@@ -130,22 +125,11 @@ function reducer(
         pointerId: null,
         tapSuppressed: true,
       };
-    case 'START_SUBMIT':
-      return { ...state, phase: 'submitting' };
-    case 'SUBMIT_SUCCEEDED':
-      return { ...state, phase: 'success' };
     case 'RESET':
-      return idleState(state.amount);
+      return idleState();
     default:
       return state;
   }
-}
-
-/** Shared potential-win calculation — the ONE place odds×amount is computed
-    for Quick Bet, used by both the session and its callers (e.g. the debug
-    pill preview), so the number can never drift between call sites. */
-export function computePotentialWin(odds: number, amount: number): number {
-  return Math.round(odds * amount);
 }
 
 export interface UseOneClickBetSessionOptions {
@@ -160,14 +144,15 @@ export interface UseOneClickBetSessionOptions {
   exitMs: number;
   /** Movement tolerance (px) — beyond this, the gesture is a scroll/drag, not a hold. */
   cancelTolerancePx: number;
-  /** Configured Quick Bet stake. */
-  amount: number;
-  /** Gesture-complete: mark the pick "selected". Called once the hold reaches 1.0. */
+  /** Gesture-complete: toggle the pick's normal selection state (add/remove,
+   *  same rules as a tap — see App.tsx's `togglePick`). A long-press only
+   *  ever adds/selects a pick; it never places a bet on its own, since an
+   *  entry requires at least 2 selections (`slipEntry.minSelections` in
+   *  buttonProgressionConfig.ts). Called once the hold reaches 1.0. */
   onAccept: (pick: Selection) => void;
-  /** How long the pressed pick shows its selected state before entry creation starts. */
+  /** How long the pressed pick shows its selected state / filled pill before
+   *  the session resets and the pill dismisses. */
   acceptToSubmitMs: number;
-  /** Async (or sync) entry creation. Resolving true → phase 'success'; false → cleanup. */
-  onSubmit: () => boolean | Promise<boolean>;
   /** Onboarding readiness ('ready' | 'needsIntro' | 'needsSetup', see
    *  oneClickBetOnboarding.ts) — informational passthrough only. This hook
    *  does not gate or alter gesture behavior on it; it's returned alongside
@@ -199,7 +184,7 @@ export function useOneClickBetSession(
   onTap: (id: string) => void,
   options: UseOneClickBetSessionOptions,
 ) {
-  const [session, dispatch] = useReducer(reducer, options.amount, idleState);
+  const [session, dispatch] = useReducer(reducer, undefined, idleState);
 
   // Plumbing refs for the rAF loop / native listeners — mirror the exact
   // mechanics of the old per-instance useLongPress, just now feeding a single
@@ -326,17 +311,10 @@ export function useOneClickBetSession(
       if (pick != null) {
         completed.current = true;
         dispatch({ type: 'HOLD_COMPLETE' });
+        // Toggle the pick's normal selection state — never places a bet on
+        // its own (see the `onAccept` doc comment above).
         optionsRef.current.onAccept(pick);
-
-        window.setTimeout(async () => {
-          dispatch({ type: 'START_SUBMIT' });
-          const ok = await optionsRef.current.onSubmit();
-          if (ok) {
-            dispatch({ type: 'SUBMIT_SUCCEEDED' });
-          } else {
-            cancelActive();
-          }
-        }, acceptToSubmitMs);
+        window.setTimeout(cancelActive, acceptToSubmitMs);
       } else {
         // No pick captured — nothing to accept; treat exactly like a
         // cancelled hold so the UI never shows a false "completed" look.
@@ -410,15 +388,12 @@ export function useOneClickBetSession(
         startX.current = e.clientX;
         startY.current = e.clientY;
 
-        const amount = optionsRef.current.amount;
         dispatch({
           type: 'PRESS_START',
           pick,
           pointerId: e.pointerId,
           x: e.clientX,
           y: e.clientY,
-          amount,
-          potentialWin: computePotentialWin(pick.odds, amount),
           now: startedAt.current,
         });
         rafId.current = requestAnimationFrame(tick);

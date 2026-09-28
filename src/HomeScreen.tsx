@@ -1,5 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import type { BindPick } from './oneClickBetSession';
+import arrowNarrowDownIcon from './assets/arrow-narrow-down.svg';
+import arrowNarrowUpIcon from './assets/arrow-narrow-up.svg';
 import betsIcon from './assets/bets.svg';
 import chevronIcon from './assets/chevron.svg';
 import gamingIcon from './assets/gaming.svg';
@@ -10,7 +12,6 @@ import plusIcon from './assets/plus.svg';
 import popularIcon from './assets/popular.svg';
 import rewardsIcon from './assets/rewards.png';
 import searchIcon from './assets/search.svg';
-import shieldIcon from './assets/shield.svg';
 import statsIcon from './assets/stats.svg';
 import userIcon from './assets/user.svg';
 import type { Selection } from './types';
@@ -53,44 +54,99 @@ const matchOf = (m: MatchInfo) => ({
   matchTime: m.matchTime,
 });
 const [M_PSG_RMA, M_ARS_RMA, M_FCB_PSG, M_LIV_MCI] = MATCHES.map(matchOf);
+type MatchFields = ReturnType<typeof matchOf>;
 
+/** One player-prop entry as authored in the table below. Omit `mas`/`menos`
+    to leave that side out of the card entirely (see the mix of
+    Más-only / Menos-only / both configurations across the mock players). */
+type PlayerPropInput = {
+  /** Slug unique within this match+market, e.g. "mbappe". */
+  id: string;
+  /** Display name, e.g. "Mbappé". */
+  pick: string;
+  mas?: number;
+  menos?: number;
+};
+
+// Builds both Selection rows (Más/Menos) for each player in `entries`, all
+// sharing one `groupId` per player so the two sides stay mutually exclusive.
+function playerProps(
+  match: MatchFields,
+  marketSlug: 'goals' | 'shots',
+  marketLabel: string,
+  threshold: number,
+  entries: PlayerPropInput[],
+): Selection[] {
+  const out: Selection[] = [];
+  for (const e of entries) {
+    const groupId = `${match.matchId}-${marketSlug}-${e.id}-${threshold}`;
+    if (e.mas !== undefined) {
+      out.push({
+        id: `${groupId}-mas`,
+        market: marketLabel,
+        pick: e.pick,
+        odds: e.mas,
+        threshold,
+        side: 'mas',
+        groupId,
+        ...match,
+      });
+    }
+    if (e.menos !== undefined) {
+      out.push({
+        id: `${groupId}-menos`,
+        market: marketLabel,
+        pick: e.pick,
+        odds: e.menos,
+        threshold,
+        side: 'menos',
+        groupId,
+        ...match,
+      });
+    }
+  }
+  return out;
+}
+
+// Deliberate mix per player: some carry only `mas` (Más), some only `menos`
+// (Menos), some both — so the feed shows every configuration the card must
+// support.
 export const MOCK_PICKS: Selection[] = [
   // ===== Paris-Saint Germain vs Real Madrid =====
-  { id: 'psg-w', market: 'Money line', pick: 'PSG', odds: 1.75, ...M_PSG_RMA },
-  { id: 'draw', market: 'Money line', pick: 'Empate', odds: 3.8, ...M_PSG_RMA },
-  { id: 'rma-w', market: 'Money line', pick: 'Real Madrid', odds: 2.75, ...M_PSG_RMA },
-  { id: 'lewa', market: GOALS_MARKET, pick: 'Lewandowski', odds: 1.95, ...M_PSG_RMA },
-  { id: 'mbappe', market: GOALS_MARKET, pick: 'Mbappé', odds: 1.65, ...M_PSG_RMA },
-  { id: 'vini', market: GOALS_MARKET, pick: 'Vinicius', odds: 2.1, ...M_PSG_RMA },
-  { id: 'mbappe-htrick', market: GOALS_MARKET, pick: 'Mbappé', odds: 9.0, ...M_PSG_RMA },
-  { id: 'lewa-htrick', market: GOALS_MARKET, pick: 'Lewandowski', odds: 11.0, ...M_PSG_RMA },
-  { id: 'vini-htrick', market: GOALS_MARKET, pick: 'Vinicius', odds: 16.0, ...M_PSG_RMA },
-  { id: 'lewa-4goals', market: GOALS_MARKET, pick: 'Lewandowski', odds: 28.0, ...M_PSG_RMA },
-  { id: 'mbappe-4goals', market: GOALS_MARKET, pick: 'Mbappé', odds: 60.0, ...M_PSG_RMA },
-  { id: 'mbappe-tiros', market: SHOTS_MARKET, pick: 'Mbappé', odds: 1.55, ...M_PSG_RMA },
-  { id: 'vini-tiros', market: SHOTS_MARKET, pick: 'Vinicius', odds: 1.8, ...M_PSG_RMA },
-  { id: 'lewa-tiros', market: SHOTS_MARKET, pick: 'Lewandowski', odds: 1.7, ...M_PSG_RMA },
+  ...playerProps(M_PSG_RMA, 'goals', GOALS_MARKET, 0.5, [
+    { id: 'mbappe', pick: 'Mbappé', mas: 1.65, menos: 2.2 },
+    { id: 'lewa', pick: 'Lewandowski', mas: 1.95 },
+    { id: 'vini', pick: 'Vinicius', menos: 1.75 },
+  ]),
+  ...playerProps(M_PSG_RMA, 'shots', SHOTS_MARKET, 1.5, [
+    { id: 'mbappe', pick: 'Mbappé', mas: 1.55, menos: 2.4 },
+    { id: 'vini', pick: 'Vinicius', mas: 1.8 },
+    { id: 'lewa', pick: 'Lewandowski', menos: 1.9 },
+  ]),
   // ===== Arsenal vs Real Madrid =====
-  { id: 'ars-w', market: 'Money line', pick: 'Arsenal', odds: 2.1, ...M_ARS_RMA },
-  { id: 'ars-draw', market: 'Money line', pick: 'Empate', odds: 3.4, ...M_ARS_RMA },
-  { id: 'ars-rma', market: 'Money line', pick: 'Real Madrid', odds: 2.55, ...M_ARS_RMA },
-  { id: 'ars-saka', market: GOALS_MARKET, pick: 'Saka', odds: 2.6, ...M_ARS_RMA },
-  { id: 'ars-odegaard', market: GOALS_MARKET, pick: 'Ødegaard', odds: 3.1, ...M_ARS_RMA },
-  { id: 'ars-saka-tiros', market: SHOTS_MARKET, pick: 'Saka', odds: 1.9, ...M_ARS_RMA },
+  ...playerProps(M_ARS_RMA, 'goals', GOALS_MARKET, 0.5, [
+    { id: 'saka', pick: 'Saka', mas: 2.6, menos: 1.5 },
+    { id: 'odegaard', pick: 'Ødegaard', mas: 3.1 },
+  ]),
+  ...playerProps(M_ARS_RMA, 'shots', SHOTS_MARKET, 1.5, [
+    { id: 'saka', pick: 'Saka', mas: 1.9 },
+  ]),
   // ===== Barcelona vs PSG =====
-  { id: 'fcb-w', market: 'Money line', pick: 'Barcelona', odds: 2.4, ...M_FCB_PSG },
-  { id: 'fcb-draw', market: 'Money line', pick: 'Empate', odds: 3.5, ...M_FCB_PSG },
-  { id: 'fcb-psg-w', market: 'Money line', pick: 'PSG', odds: 2.3, ...M_FCB_PSG },
-  { id: 'fcb-yamal', market: GOALS_MARKET, pick: 'Yamal', odds: 2.2, ...M_FCB_PSG },
-  { id: 'fcb-mbappe', market: GOALS_MARKET, pick: 'Mbappé', odds: 1.9, ...M_FCB_PSG },
-  { id: 'fcb-yamal-tiros', market: SHOTS_MARKET, pick: 'Yamal', odds: 1.75, ...M_FCB_PSG },
+  ...playerProps(M_FCB_PSG, 'goals', GOALS_MARKET, 0.5, [
+    { id: 'yamal', pick: 'Yamal', mas: 2.2, menos: 1.6 },
+    { id: 'mbappe', pick: 'Mbappé', mas: 1.9 },
+  ]),
+  ...playerProps(M_FCB_PSG, 'shots', SHOTS_MARKET, 1.5, [
+    { id: 'yamal', pick: 'Yamal', menos: 1.75 },
+  ]),
   // ===== Liverpool vs Man City =====
-  { id: 'liv-w', market: 'Money line', pick: 'Liverpool', odds: 2.55, ...M_LIV_MCI },
-  { id: 'liv-draw', market: 'Money line', pick: 'Empate', odds: 3.6, ...M_LIV_MCI },
-  { id: 'mci-w', market: 'Money line', pick: 'Manchester City', odds: 2.2, ...M_LIV_MCI },
-  { id: 'liv-salah', market: GOALS_MARKET, pick: 'Salah', odds: 2.0, ...M_LIV_MCI },
-  { id: 'mci-haaland', market: GOALS_MARKET, pick: 'Haaland', odds: 1.7, ...M_LIV_MCI },
-  { id: 'mci-haaland-tiros', market: SHOTS_MARKET, pick: 'Haaland', odds: 1.6, ...M_LIV_MCI },
+  ...playerProps(M_LIV_MCI, 'goals', GOALS_MARKET, 0.5, [
+    { id: 'salah', pick: 'Salah', menos: 2.0 },
+    { id: 'haaland', pick: 'Haaland', mas: 1.7, menos: 2.3 },
+  ]),
+  ...playerProps(M_LIV_MCI, 'shots', SHOTS_MARKET, 1.5, [
+    { id: 'haaland', pick: 'Haaland', mas: 1.6, menos: 2.1 },
+  ]),
 ];
 
 /* ============================================================ */
@@ -325,12 +381,12 @@ function MatchTabsRow() {
 
 /* ============================================================ */
 /*  Pills row — Figma node 1665:43054                           */
-/*  6 chip-style pills with one selected (POPULARES) showing a  */
+/*  4 chip-style pills with one selected (POPULARES) showing a  */
 /*  transparent purple gradient + #4b20ff border + flame icon.  */
 /* ============================================================ */
 function TabsAndPills() {
   const [activePill, setActivePill] = useState<string>('POPULARES');
-  const pills = ['POPULARES', 'PARTIDOS', '1era MITAD', 'TIROS', 'GOLES', 'OTROS'];
+  const pills = ['POPULARES', 'TIROS', 'GOLES', 'OTROS'];
 
   return (
     <div className="no-scrollbar flex w-full items-center gap-1.5 overflow-x-auto px-3 pt-1">
@@ -387,218 +443,12 @@ function TabsAndPills() {
 }
 
 /* ============================================================ */
-/*  Promo carousel — Champions card with PSG vs Real Madrid     */
-/* ============================================================ */
-/*  Long-press → "Lightning Straight Bet" (instant entry). Gesture/progress/  */
-/*  entry-creation state now live in the centralized OneClickBetSession       */
-/*  (src/oneClickBetSession.ts), mounted ONCE in App.tsx — this component      */
-/*  and MarketAccordion below just receive its `bind`/`cancelActivePress`       */
-/*  API as props and call `bindPick(pick)` on each button. See that file for    */
-/*  the full phase machine + progress/native-listener mechanics.                */
-/* ============================================================ */
-
-type PromoCarouselProps = {
-  selectedIds: Set<string>;
-  bindPick: BindPick;
-};
-
-/** One match card (Figma "newLeagueMarkets" 1624:44632) — league + tags,
-    the two teams + kickoff, and the money-line 3-way as odds buttons. */
-function MatchCard({
-  match,
-  selectedIds,
-  bindPick,
-}: {
-  match: MatchInfo;
-  selectedIds: Set<string>;
-  bindPick: BindPick;
-}) {
-  // Money-line picks for THIS match, in [home, draw, away] order.
-  const lines = MOCK_PICKS.filter(
-    (p) => p.matchId === match.matchId && p.market === 'Money line',
-  );
-  // Label by position (0 = home, draw = EMPATE, else away) — the pick names
-  // are full team names ("Paris-Saint Germain"), so we can't match them to
-  // abbrevs.
-  const labelFor = (p: Selection, i: number) =>
-    p.pick === 'Empate' ? 'EMPATE' : i === 0 ? match.homeAbbrev : match.awayAbbrev;
-
-  return (
-    // Missing asset: the decorative "light" glow blob positioned at the
-    // top of the card (imgLight in the Figma export). Skipped here —
-    // ask Javier to upload it; placeholder slot left below where it goes.
-    <div
-      className="relative w-full overflow-hidden rounded-[20px] border border-[rgba(251,251,251,0.24)] bg-black pt-2"
-      style={{ backdropFilter: 'blur(10.15px)', WebkitBackdropFilter: 'blur(10.15px)' }}
-    >
-      {/* PLACEHOLDER for the decorative "light" graphic — Figma puts
-          it at top: -36.11px overflowing slightly above the card. */}
-
-      {/* League + tags row */}
-      <div className="flex w-full items-center justify-center gap-1 px-2.5">
-        <div className="flex items-center gap-1">
-          <p
-            className="whitespace-nowrap text-right text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.5)]"
-            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-          >
-            {match.league}
-          </p>
-          <span
-            aria-hidden
-            className="block h-0.5 w-0.5 rounded-full bg-[rgba(251,251,251,0.5)]"
-          />
-        </div>
-        <div className="flex items-start gap-1">
-          <span
-            className="flex h-[15px] min-w-5 items-center justify-center rounded-md bg-[rgba(251,251,251,0.16)] px-1 text-[10px] font-bold leading-[15px] text-[rgba(251,251,251,0.7)]"
-            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-          >
-            PA
-          </span>
-          <span
-            className="flex h-[15px] min-w-5 items-center justify-center rounded-md bg-[rgba(251,251,251,0.16)] px-1 text-[10px] font-bold leading-[15px] text-[rgba(251,251,251,0.7)]"
-            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-          >
-            90&apos;
-          </span>
-        </div>
-      </div>
-
-      {/* Match row — Team 1 / center kickoff / Team 2 */}
-      <div className="flex w-full items-start gap-2 px-2.5 pb-2">
-        <div className="flex flex-1 flex-col items-center gap-0.5">
-          <img src={shieldIcon} alt="" aria-hidden className="h-8 w-8" />
-          <p
-            className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.7)]"
-            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-          >
-            {match.homeName}
-          </p>
-        </div>
-        <div className="flex flex-1 flex-col items-center justify-center self-stretch">
-          <p
-            className="whitespace-nowrap text-[12px] font-bold leading-[18px] text-[#fbfbfb]"
-            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-          >
-            {match.matchTime}
-          </p>
-        </div>
-        <div className="flex flex-1 flex-col items-center justify-end gap-0.5">
-          <img src={shieldIcon} alt="" aria-hidden className="h-8 w-8" />
-          <p
-            className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.7)]"
-            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-          >
-            {match.awayName}
-          </p>
-        </div>
-      </div>
-
-      {/* Odds row — the money-line 3-way. Each toggles a MOCK_PICKS id into
-          the slip; selected state = lime→cyan gradient + bold odds. Quick
-          Bet gesture/hold state is driven by the shared OneClickBetSession
-          via `bindPick` (src/oneClickBetSession.ts); hold progress itself
-          renders only in the floating pill (OneClickBetPill.tsx), not here —
-          `qb-hold`/`qb-press` now only suppress native touch/selection
-          behavior. */}
-      <div className="flex w-full items-center justify-end gap-1 px-2.5 pb-2.5">
-        {lines.map((p, i) => {
-          const selected = selectedIds.has(p.id);
-          return (
-            <button
-              key={p.id}
-              type="button"
-              {...bindPick(p)}
-              className={`qb-hold qb-press flex h-11 min-w-[58px] flex-1 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border px-3 py-1 transition-all duration-200 active:scale-[0.96] ${
-                selected
-                  ? 'border-[#d2ff72] bg-gradient-to-b from-[rgba(210,255,114,0.16)] to-[rgba(86,222,234,0.16)]'
-                  : 'border-[rgba(251,251,251,0.08)] bg-[rgba(251,251,251,0.1)] hover:bg-[rgba(251,251,251,0.14)]'
-              }`}
-            >
-              <span
-                className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-center text-[10px] font-medium leading-[15px] text-[rgba(251,251,251,0.5)]"
-                style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-              >
-                {labelFor(p, i)}
-              </span>
-              <span
-                className={`whitespace-nowrap text-center text-[13px] leading-4 text-[#fbfbfb] ${
-                  selected ? 'font-bold' : 'font-medium'
-                }`}
-                style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-              >
-                {p.odds.toFixed(2)}x
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PromoCarousel({ selectedIds, bindPick }: PromoCarouselProps) {
-  // Real horizontal scroll-snap carousel over every match on the feed.
-  // Cards snap-CENTER; the active dot tracks whichever card's center is
-  // nearest the carousel's center, measured from live rects so it stays
-  // correct for center snapping (not just a fixed-width computation).
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(0);
-  const onScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const center = r.left + r.width / 2;
-    let best = 0;
-    let bestDist = Infinity;
-    [...el.children].forEach((k, i) => {
-      const kr = (k as HTMLElement).getBoundingClientRect();
-      const dist = Math.abs(kr.left + kr.width / 2 - center);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = i;
-      }
-    });
-    setActive(Math.max(0, Math.min(MATCHES.length - 1, best)));
-  };
-
-  return (
-    // pt-3 = 12px gap from the pills row above (per design spec).
-    <div className="w-full pb-2 pt-3">
-      <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto px-3"
-      >
-        {MATCHES.map((m) => (
-          <div key={m.matchId} className="w-[86%] shrink-0 snap-center">
-            <MatchCard match={m} selectedIds={selectedIds} bindPick={bindPick} />
-          </div>
-        ))}
-      </div>
-
-      {/* Carousel dots — one per match, active dot widens. */}
-      <div className="mt-2 flex justify-center gap-1.5">
-        {MATCHES.map((m, i) => (
-          <div
-            key={m.matchId}
-            className={`h-1.5 rounded-full transition-all duration-200 ${
-              i === active ? 'w-4 bg-white' : 'w-1.5 bg-white/40'
-            }`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================ */
 /*  Market accordion — Figma "marketAccordeon" node 1628:42604  */
 /*  2×2 grid of player-prop cards. Each card has the player's   */
 /*  silhouette (player.svg), name + position, match info, stats */
 /*  icon, and an odds button at the bottom that toggles the     */
 /*  corresponding pick into the bet slip. Selected state uses   */
-/*  the same lime-cyan visual language as the PromoCarousel.    */
+/*  the lime-cyan gradient for the selected Más/Menos control.  */
 /*                                                              */
 /*  Parameterized by `title` (the market name); filters `picks`  */
 /*  to that market across every match on the feed, reading each   */
@@ -627,6 +477,43 @@ function splitKickoff(matchTime: string): { date: string; time: string } {
   return { date: date.toUpperCase(), time: rest.join(' ') };
 }
 
+/** One player's card worth of data: the shared match/threshold context plus
+    whichever of Más/Menos this player carries (see MOCK_PICKS — some players
+    only have one side, some have both). Grouped by `groupId` so the pair
+    renders as ONE card with up to two selection controls. */
+type PlayerGroup = {
+  groupId: string;
+  pick: string;
+  threshold: number;
+  matchTime: string;
+  homeAbbrev: string;
+  awayAbbrev: string;
+  mas?: Selection;
+  menos?: Selection;
+};
+
+function groupPlayerPicks(picks: Selection[], market: string): PlayerGroup[] {
+  const byGroup = new Map<string, PlayerGroup>();
+  for (const p of picks) {
+    if (p.market !== market) continue;
+    let group = byGroup.get(p.groupId);
+    if (!group) {
+      group = {
+        groupId: p.groupId,
+        pick: p.pick,
+        threshold: p.threshold,
+        matchTime: p.matchTime,
+        homeAbbrev: p.homeAbbrev,
+        awayAbbrev: p.awayAbbrev,
+      };
+      byGroup.set(p.groupId, group);
+    }
+    if (p.side === 'mas') group.mas = p;
+    else group.menos = p;
+  }
+  return [...byGroup.values()];
+}
+
 function MarketAccordion({
   title,
   picks,
@@ -635,8 +522,9 @@ function MarketAccordion({
   cancelActivePress,
 }: MarketProps) {
   const [isOpen, setIsOpen] = useState(true);
-  // Player-prop cards for THIS market only, across every match on the feed.
-  const playerPicks = picks.filter((p) => p.market === title);
+  // Player-prop cards for THIS market only, across every match on the feed —
+  // one entry per player, each carrying whichever Más/Menos options it has.
+  const playerGroups = groupPlayerPicks(picks, title);
 
   // Collapsing the accordion unmounts the player cards below — the
   // selection being held becomes unavailable, so cancel any in-flight
@@ -661,12 +549,6 @@ function MarketAccordion({
           >
             {title}
           </p>
-          <span
-            className="flex h-[15px] min-w-5 items-center justify-center rounded-md bg-[rgba(251,251,251,0.16)] px-1 text-[10px] font-bold leading-[15px] text-[rgba(251,251,251,0.7)]"
-            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-          >
-            90&apos;
-          </span>
         </div>
         <div className="ml-6 flex size-6 shrink-0 items-center justify-center rounded-full border border-[rgba(251,251,251,0.24)]">
           <img
@@ -684,27 +566,21 @@ function MarketAccordion({
       {isOpen && (
         <div className="flex flex-col gap-1 pt-1">
           <div className="grid grid-cols-2 gap-2">
-            {playerPicks.map((p) => {
-              const { date, time } = splitKickoff(p.matchTime);
-              const position = PLAYER_POSITION[p.pick] ?? 'DEL';
-              const selected = selectedIds.has(p.id);
+            {playerGroups.map((g) => {
+              const { date, time } = splitKickoff(g.matchTime);
+              const position = PLAYER_POSITION[g.pick] ?? 'DEL';
+              // Labeled selection controls — Más/Menos of the same
+              // market+threshold are mutually exclusive (enforced by
+              // App.tsx's togglePick via `groupId`); tapping the selected
+              // one deselects it instead of toggling to the other.
+              const options = [
+                g.mas && { key: 'mas' as const, label: 'Más', sel: g.mas },
+                g.menos && { key: 'menos' as const, label: 'Menos', sel: g.menos },
+              ].filter((o): o is { key: 'mas' | 'menos'; label: string; sel: Selection } => Boolean(o));
               return (
-                <button
-                  key={p.id}
-                  type="button"
-                  {...bindPick(p)}
-                  // Selected state changes ONLY the odds button at the
-                  // bottom (lime-cyan gradient + Bold odds); the outer
-                  // card border stays neutral in both states. Quick Bet hold
-                  // progress no longer renders inline anywhere on the card —
-                  // it shows only in the floating pill (OneClickBetPill.tsx);
-                  // the card itself stays the press TARGET (unchanged) but
-                  // does not animate. `qb-press` (NOT `qb-hold`, which only
-                  // carries a touch-action rule now) recursively suppresses
-                  // native text-selection/callout/drag on this card and every
-                  // descendant — the real fix for long-press triggering the
-                  // browser's native selection UI (see index.css).
-                  className="qb-press relative flex cursor-pointer flex-col items-center gap-2 overflow-hidden rounded-[20px] border border-[rgba(251,251,251,0.12)] bg-black p-2.5 transition-all duration-200 active:scale-[0.98]"
+                <div
+                  key={g.groupId}
+                  className="relative flex flex-col items-center gap-2 overflow-hidden rounded-[20px] border border-[rgba(251,251,251,0.12)] bg-black p-2.5"
                 >
                   {/* TODO: decorative "light" glow at top of card —
                       Figma uses imgLight (no asset uploaded). */}
@@ -726,13 +602,13 @@ function MarketAccordion({
                       style={{ fontFamily: 'Red Hat Display, sans-serif' }}
                     >
                       <span className="font-medium text-[rgba(251,251,251,0.7)]">
-                        {p.homeAbbrev}
+                        {g.homeAbbrev}
                       </span>
                       <span className="font-medium text-[rgba(251,251,251,0.44)]">
                         vs
                       </span>
                       <span className="font-medium text-[rgba(251,251,251,0.44)]">
-                        {p.awayAbbrev}
+                        {g.awayAbbrev}
                       </span>
                     </div>
                     <span
@@ -775,7 +651,7 @@ function MarketAccordion({
                       style={{ fontFamily: 'Red Hat Display, sans-serif' }}
                     >
                       <span className="text-[14px] font-medium leading-[21px] text-[#fbfbfb]">
-                        {p.pick}
+                        {g.pick}
                       </span>
                       <span className="text-[10px] font-medium leading-[15px] text-[rgba(251,251,251,0.44)]">
                         {position}
@@ -783,28 +659,62 @@ function MarketAccordion({
                     </div>
                   </div>
 
-                  {/* Odds button at the bottom — same default/selected
-                      visual language as the PromoCarousel buttons. Hold
-                      progress no longer renders here (see the floating
-                      pill, OneClickBetPill.tsx) — this stays `qb-hold` only
-                      for its touch-action rule. */}
-                  <div
-                    className={`qb-hold flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border px-3 py-1 ${
-                      selected
-                        ? 'border-[#d2ff72] bg-gradient-to-b from-[rgba(210,255,114,0.16)] to-[rgba(86,222,234,0.16)]'
-                        : 'border-[rgba(251,251,251,0.08)] bg-[rgba(251,251,251,0.1)]'
-                    }`}
-                  >
-                    <span
-                      className={`whitespace-nowrap text-center text-[13px] leading-4 text-[#fbfbfb] ${
-                        selected ? 'font-bold' : 'font-medium'
-                      }`}
-                      style={{ fontFamily: 'Red Hat Display, sans-serif' }}
-                    >
-                      {p.odds.toFixed(2)}x
-                    </span>
+                  {/* Selection controls — Figma "playerProps" (20216:22083):
+                      MÁS/MENOS label on top, arrow icon + line value below.
+                      No odds are shown. When both sides exist they join into
+                      one pill (1.5px hairline gap, only the outer corners
+                      rounded); a single side keeps all four corners rounded.
+                      Hold progress renders only in the floating pill
+                      (OneClickBetPill.tsx) — these stay `qb-hold` only for
+                      the touch-action rule. */}
+                  <div className="flex h-11 w-full items-center gap-[1.5px]">
+                    {options.map(({ key, label, sel }, i) => {
+                      const selected = selectedIds.has(sel.id);
+                      const corners =
+                        options.length === 1
+                          ? 'rounded-xl'
+                          : i === 0
+                            ? 'rounded-l-xl'
+                            : 'rounded-r-xl';
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          {...bindPick(sel)}
+                          aria-pressed={selected}
+                          className={`qb-hold qb-press flex h-11 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 overflow-hidden border px-2 py-1 transition-all duration-200 active:scale-[0.96] ${corners} ${
+                            selected
+                              ? 'border-[#d2ff72] bg-gradient-to-b from-[rgba(210,255,114,0.16)] to-[rgba(86,222,234,0.16)]'
+                              : 'border-[rgba(251,251,251,0.08)] bg-[rgba(251,251,251,0.12)]'
+                          }`}
+                        >
+                          <span
+                            className="whitespace-nowrap text-center text-[10px] font-medium leading-[15px] text-[rgba(251,251,251,0.5)]"
+                            style={{ fontFamily: 'Red Hat Display, sans-serif' }}
+                          >
+                            {label.toUpperCase()}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <img
+                              src={key === 'mas' ? arrowNarrowUpIcon : arrowNarrowDownIcon}
+                              alt=""
+                              aria-hidden
+                              className="h-3 w-3"
+                            />
+                            <span
+                              className={`whitespace-nowrap text-center text-[14px] leading-[21px] text-[#fbfbfb] ${
+                                selected ? 'font-bold' : 'font-medium'
+                              }`}
+                              style={{ fontFamily: 'Red Hat Display, sans-serif' }}
+                            >
+                              {g.threshold}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -815,7 +725,7 @@ function MarketAccordion({
             className="mt-1 flex w-full cursor-pointer items-center justify-center gap-1 py-2 text-[14px] font-medium leading-[21px] text-[#fbfbfb] transition-opacity hover:opacity-80"
             style={{ fontFamily: 'Red Hat Display, sans-serif' }}
           >
-            Ver todos ({playerPicks.length})
+            Ver todos ({playerGroups.length})
             <img
               src={chevronIcon}
               alt=""
@@ -1034,7 +944,7 @@ function HomeScreenChromeImpl({
         <Header />
       </div>
 
-      {/* PINNED HEADER STACK — leagues row + match tabs + pill markets, all
+      {/* PINNED HEADER STACK — leagues row + match tabs + pill markets,
           pinned just below the topbar. The leagues row collapses (height +
           opacity) while scrolling down and springs back on scroll-up. */}
       <div className="sticky z-20 bg-black" style={{ top: topbarH }}>
@@ -1049,7 +959,6 @@ function HomeScreenChromeImpl({
         <TabsAndPills />
       </div>
 
-      <PromoCarousel selectedIds={selectedIds} bindPick={bindPick} />
       <MarketAccordion
         title={GOALS_MARKET}
         picks={picks}

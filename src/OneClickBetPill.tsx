@@ -55,12 +55,11 @@ export type OneClickBetPillState =
   | 'filled';
 
 export interface OneClickBetPillProps {
-  /** Cumulative odds, e.g. 1.75 → "1.75x". */
+  /** This pick's own odds, e.g. 1.75 → "1.75x". Purely informational — an
+   *  entry's real amount/potential winnings are fixed by selection count
+   *  (see `buttonProgressionConfig.slipEntry`), not shown here since a
+   *  single held pick is never, by itself, a complete entry. */
   odds: number;
-  /** Stake amount, e.g. 200 → "$200". */
-  amount: number;
-  /** Potential winnings, e.g. 350 → "$350". */
-  potentialWin: number;
   /** Fill progress 0–1. Only meaningful while `state` is `pressing` or `reversing`. */
   progress?: number;
   state: OneClickBetPillState;
@@ -102,8 +101,6 @@ const smoothstep = (edge0: number, edge1: number, v: number) => {
 
 export function OneClickBetPill({
   odds,
-  amount,
-  potentialWin,
   progress = 0,
   state,
   className = '',
@@ -333,22 +330,6 @@ export function OneClickBetPill({
             </p>
             <p className="whitespace-nowrap text-[12px] font-medium leading-[16px] text-[rgba(251,251,251,0.5)]">
               Momio
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col items-start justify-center">
-            <p className="whitespace-nowrap text-[14px] font-black leading-[21px] text-[#fbfbfb]">
-              ${amount}
-            </p>
-            <p className="whitespace-nowrap text-[12px] font-medium leading-[16px] text-[rgba(251,251,251,0.5)]">
-              Monto
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col items-start justify-center">
-            <p className="whitespace-nowrap text-[14px] font-black leading-[21px] text-[#fbfbfb]">
-              ${potentialWin}
-            </p>
-            <p className="whitespace-nowrap text-[12px] font-medium leading-[16px] text-[rgba(251,251,251,0.5)]">
-              Ganancia potencial
             </p>
           </div>
         </div>

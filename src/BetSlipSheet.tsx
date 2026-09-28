@@ -9,12 +9,15 @@ import {
 } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import closeIcon from './assets/close.svg';
-import editIcon from './assets/edit.svg';
-import shieldIcon from './assets/shield.svg';
-import { buttonProgressionConfig } from './buttonProgressionConfig';
+import playerIcon from './assets/player.svg';
+import {
+  buttonProgressionConfig,
+  canConfirmEntry,
+  getSlipEntryValues,
+} from './buttonProgressionConfig';
 import { ButtonPreviewMomios } from './ButtonPreviewMomios';
 import { SwipeToConfirm } from './SwipeToConfirm';
-import type { Selection } from './types';
+import type { FixedEntryVariant, Selection } from './types';
 
 /**
  * BetSlipSheet — the one-click bet slip, as a single morphing container.
@@ -40,8 +43,6 @@ import type { Selection } from './types';
  * onKeepAlive (defers auto-collapse).
  */
 
-const STAKE = 200; // fixed demo stake — matches ButtonPreviewMomios
-const fmtOdds = (n: number) => `${n.toFixed(2)}x`;
 
 // Morph geometry.
 const COLLAPSED_H = 72; // ButtonPreviewMomios footprint (56px pill + 8/8 pad)
@@ -119,6 +120,9 @@ type Props = {
   onKeepAlive: () => void;
   /** Parlay "Lista" tab — opens the full-screen summary sheet. */
   onOpenList: () => void;
+  /** EXPLORATION (`explore/fixed-entry-values-ui`) — forwarded to the
+      collapsed pill (`ButtonPreviewMomios`). Default 'peek'. */
+  fixedEntryVariant?: FixedEntryVariant;
 };
 
 export function BetSlipSheet({
@@ -131,8 +135,14 @@ export function BetSlipSheet({
   onConfirm,
   onKeepAlive,
   onOpenList,
+  fixedEntryVariant = 'peek',
 }: Props) {
-  const potentialWin = Math.round(cumulativeOdds * STAKE);
+  // Entry amount + potential winnings come from the centralized
+  // selection-count config, not from odds (see buttonProgressionConfig's
+  // `slipEntry`). Below `minSelections` both are 0 and confirmation is
+  // disabled — the same rule the pill and the "Resumen" full sheet apply.
+  const { amount, potentialWin } = getSlipEntryValues(selections.length);
+  const canConfirm = canConfirmEntry(selections.length);
   // Summarized slip shows AT MOST 2 selections (latest first). Once a 3rd is
   // added the slip auto-collapses (App.tsx), so the expanded card only ever
   // renders 1 or 2 rows. 1 selection keeps its existing single-row layout;
@@ -414,6 +424,7 @@ export function BetSlipSheet({
             cumulativeOdds={cumulativeOdds}
             speedScale={1}
             tier3OddsEffect={buttonProgressionConfig.tier3OddsEffect}
+            fixedEntryVariant={fixedEntryVariant}
           />
         </motion.div>
 
@@ -459,12 +470,12 @@ export function BetSlipSheet({
                     <img src={closeIcon} alt="" className="size-4" />
                   </button>
                   <div className="h-10 w-px shrink-0 bg-[rgba(251,251,251,0.16)]" />
-                  {/* shield + market/pick */}
+                  {/* player placeholder + market/pick */}
                   <div className="flex min-w-px flex-1 items-center gap-[6px] overflow-hidden px-[6px] py-1">
                     <div className="relative size-11 shrink-0">
                       <div className="absolute right-1 top-1/2 size-9 -translate-y-1/2 overflow-hidden rounded-lg backdrop-blur-[2px]">
                         <img
-                          src={shieldIcon}
+                          src={playerIcon}
                           alt=""
                           className="size-full object-contain p-[3px]"
                         />
@@ -478,12 +489,6 @@ export function BetSlipSheet({
                         {sel.pick}
                       </p>
                     </div>
-                  </div>
-                  {/* odds */}
-                  <div className="flex w-[85px] shrink-0 flex-col items-end justify-center pl-1 pr-3">
-                    <span className="whitespace-nowrap text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
-                      {fmtOdds(sel.odds)}
-                    </span>
                   </div>
                 </div>
               ))}
@@ -505,7 +510,7 @@ export function BetSlipSheet({
                   <div className="flex min-w-px flex-1 items-center gap-1">
                     <div className="size-9 shrink-0 backdrop-blur-[2px]">
                       <img
-                        src={shieldIcon}
+                        src={playerIcon}
                         alt=""
                         className="size-full object-contain p-[3px]"
                       />
@@ -530,25 +535,32 @@ export function BetSlipSheet({
           {/* Divider */}
           <div className="h-px w-full bg-[rgba(251,251,251,0.1)]" />
 
-          {/* Entry info — Monto / Momio / Ganancia */}
+          {/* Entry info — Monto / Acierta N/N / Ganancia, from the
+              centralized selection-count config (not editable, not
+              derived from odds — see buttonProgressionConfig's
+              `slipEntry`). "Acierta N/N" replaces the old odds ("Momio")
+              field — a parlay needs every selection to hit, so it's
+              always selections.length/selections.length; below the
+              2-selection minimum it shows an inactive "—/—" instead of
+              implying a valid entry could already be placed. */}
           <div className="flex w-full items-center gap-3 px-[10px] pt-[10px]">
             <div className="flex min-w-px flex-1 flex-col items-center justify-center">
-              <div className="flex items-center gap-1">
-                <img src={editIcon} alt="" className="size-3" />
-                <p className="text-[14px] font-black leading-[21px] text-[#fbfbfb]">
-                  ${STAKE}
-                </p>
-              </div>
+              <p className="text-[14px] font-black leading-[21px] text-[#fbfbfb]">
+                ${amount}
+              </p>
               <p className="text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
                 Monto
               </p>
             </div>
-            <div className="flex min-w-px flex-1 flex-col items-center justify-center">
+            <div
+              className="flex min-w-px flex-1 flex-col items-center justify-center"
+              style={{ opacity: canConfirm ? 1 : 0.4 }}
+            >
               <p className="text-[14px] font-black leading-[21px] text-[#fbfbfb]">
-                {fmtOdds(cumulativeOdds)}
+                {canConfirm ? `${selections.length}/${selections.length}` : '—/—'}
               </p>
               <p className="text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
-                Momio
+                Acierta
               </p>
             </div>
             <div className="flex min-w-px flex-1 flex-col items-center justify-center">
@@ -561,14 +573,25 @@ export function BetSlipSheet({
             </div>
           </div>
 
+          {/* Minimum-selection notice — only reachable via the debug
+              "Summarized slip" preview at 1 selection (production always
+              collapses this content). */}
+          {!canConfirm && (
+            <p className="px-[10px] pt-2 text-center text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
+              Agrega al menos 2 selecciones para crear tu apuesta.
+            </p>
+          )}
+
           {/* Swipe to confirm — shared component (remounts on collapse via key
-              so its swipe/loader state resets). */}
+              so its swipe/loader state resets). Disabled below the
+              2-selection minimum. */}
           <div className="flex w-full flex-col px-[10px] pb-[10px] pt-2">
             <SwipeToConfirm
               key={expanded ? 'expanded' : 'collapsed'}
-              stake={STAKE}
+              stake={amount}
               onConfirm={onConfirm}
               onSwipeStart={onKeepAlive}
+              disabled={!canConfirm}
             />
           </div>
         </motion.div>

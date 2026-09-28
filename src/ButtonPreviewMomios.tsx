@@ -20,13 +20,16 @@ import {
 // glow has been replaced with a layered box-shadow stack on the pill
 // shell, driven by the same logic as the odds text-shadow. The file
 // BorderLight.tsx is intentionally left on disk in case we revert.
-import { buttonProgressionConfig as cfg } from './buttonProgressionConfig';
-import { OddsSmokeEffect } from './OddsEffects';
-import { OddsRipple } from './OddsRipple';
+import {
+  buttonProgressionConfig as cfg,
+  canConfirmEntry,
+  getNextSlipEntryValues,
+  getSlipEntryValues,
+} from './buttonProgressionConfig';
 import { OutlineRipple } from './OutlineRipple';
 import { playSound } from './playSound';
 import { SlotNumber } from './SlotNumber';
-import type { Tier } from './types';
+import type { FixedEntryVariant, Tier } from './types';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 /* =================================================================== */
@@ -38,11 +41,6 @@ export function tierForOdds(odds: number): Tier {
   }
   return 0;
 }
-
-/* =================================================================== */
-/*  Helpers                                                            */
-/* =================================================================== */
-const formatOdds = (n: number) => `${n.toFixed(2)}x`;
 
 type Sparkle = { id: number; x: number; y: number; size: number };
 
@@ -66,6 +64,9 @@ type Props = {
   onLiveState?: (s: ButtonLiveState) => void;
   /** PASS 3 — Tier 3 odds effect variant. Default 'flames'. */
   tier3OddsEffect?: 'flames' | 'smoke';
+  /** EXPLORATION (`explore/fixed-entry-values-ui`) — which fixed-entry-values
+      treatment the collapsed pill shows. Default 'peek'. */
+  fixedEntryVariant?: FixedEntryVariant;
 };
 
 export function ButtonPreviewMomios({
@@ -74,6 +75,7 @@ export function ButtonPreviewMomios({
   speedScale = 1,
   onLiveState,
   tier3OddsEffect = cfg.tier3OddsEffect,
+  fixedEntryVariant = 'peek',
 }: Props) {
   // MASTER SWITCH — when `cfg.animationsEnabled` is false, treat the button
   // as reduced-motion. This reuses every existing `!reduced` gate to suppress
@@ -558,14 +560,11 @@ export function ButtonPreviewMomios({
   const [outlineRipples, setOutlineRipples] = useState<
     Array<{ id: number; prominent: boolean }>
   >([]);
-  // Odds ripples — T3-only ghost copies of the Momio digits that scale
-  // outward + fade on every selection ADD. Each carries its odds-text
-  // snapshot so the ghost doesn't re-render with the latest value mid-
-  // animation.
-  const [oddsRipples, setOddsRipples] = useState<
-    Array<{ id: number; text: string }>
-  >([]);
-
+  // EXPLORATION (`explore/fixed-entry-values-ui`) — the 'peek' variant's
+  // transient "next step" tooltip, shown briefly above the pill whenever a
+  // selection is added. The 'level' variant reuses `selectionCount` itself
+  // as the animate-key for its "+1 nivel" pop, so it needs no extra state.
+  const [showNextPeek, setShowNextPeek] = useState(false);
   /* =============================================================== */
   /*  REGRESSION FIX — Odds glow as a TEXT-SHADOW STACK on the real  */
   /*  text. No duplicate text elements (the previous duplicate-span  */
@@ -801,6 +800,18 @@ export function ButtonPreviewMomios({
       playSound('slot-end');
     }, effectiveSlotMs);
 
+    // EXPLORATION (`explore/fixed-entry-values-ui`) — 'peek' variant's
+    // transient "next step" tooltip. Only on adds, only while there's a
+    // next step to preview (i.e. not already at `maxSelections`).
+    if (
+      fixedEntryVariant === 'peek' &&
+      selectionCount > prev &&
+      getNextSlipEntryValues(selectionCount)
+    ) {
+      setShowNextPeek(true);
+      setTimeout(() => setShowNextPeek(false), cfg.fixedEntryPeek.durationMs);
+    }
+
     // 5. Center radial burst — white ring radiating from the button
     //    center on every selection add. Active at T0/T1/T2; suppressed
     //    at T3 because the new OddsRipple + outline ripple together
@@ -844,40 +855,14 @@ export function ButtonPreviewMomios({
     }
 
     // T3+ on add: odds-value burst — scale pop + transient white
-    // drop-shadow flash (the "glow flash on the source" that pairs with
-    // the OddsRipple ghost overlay below). Both share the same 300ms
-    // ease-out timing so they read as a single beat. Inherited at T4.
+    // drop-shadow flash. Odds are no longer displayed (see the
+    // selection-count entry rules), so the burst no longer has a Momio
+    // element to sit on; the ghost-ripple overlay that used to pair with
+    // it (OddsRipple) is retired for the same reason. `oddsBurstControls`
+    // is kept as a still-referenced (inert) AnimationControls so the T4
+    // vignette/tier-crossing logic downstream doesn't need touching.
     if (tier >= 3 && selectionCount > prev) {
-      oddsBurstControls.start({
-        scale: [1, cfg.tier3.oddsAddBurstScale, 1],
-        filter: [
-          'drop-shadow(0 0 0px rgba(255,255,255,0))',
-          `drop-shadow(0 0 ${cfg.tier3.oddsAddBurstFlashBlurPx}px rgba(255,255,255,0.9))`,
-          'drop-shadow(0 0 0px rgba(255,255,255,0))',
-        ],
-        transition: {
-          duration: cfg.tier3.oddsAddBurstDurationMs / 1000,
-          ease: 'easeOut',
-        },
-      });
-
-      // Spawn a ghost copy of the digits that expands outward + fades.
-      // Snapshots the current oddsLabel so the ripple doesn't morph mid-
-      // animation when the SlotNumber rolls to the new value. Caps at
-      // oddsRippleMaxStacked simultaneous ripples on rapid adds.
-      const rippleId = performance.now();
-      const snapshot = oddsLabel;
-      setOddsRipples((cur) => {
-        const next = [...cur, { id: rippleId, text: snapshot }];
-        if (next.length > cfg.tier3.oddsRippleMaxStacked) {
-          return next.slice(next.length - cfg.tier3.oddsRippleMaxStacked);
-        }
-        return next;
-      });
-      setTimeout(
-        () => setOddsRipples((cur) => cur.filter((r) => r.id !== rippleId)),
-        cfg.tier3.oddsRippleDurationMs + 60,
-      );
+      oddsBurstControls.start({ scale: 1 });
     }
 
     // Odds text-shadow surge on update — T3 ONLY now (the odds halo
@@ -894,6 +879,7 @@ export function ButtonPreviewMomios({
     countControls,
     oddsSettleControls,
     oddsBurstControls,
+    fixedEntryVariant,
   ]);
 
   /* =============================================================== */
@@ -1048,32 +1034,19 @@ export function ButtonPreviewMomios({
   /* =============================================================== */
   /*  DERIVED display                                                */
   /* =============================================================== */
-  const oddsLabel = useMemo(() => formatOdds(cumulativeOdds), [cumulativeOdds]);
-  const stake = 200;
-  const potentialWin = Math.round(cumulativeOdds * stake);
-
-  /* =============================================================== */
-  /*  Effective slot duration for the odds digit roll               */
-  /*  Two tier-dependent overrides + one one-shot override:         */
-  /*    T1 first 0 → 1 selection: 800ms (count-up sweep)            */
-  /*    T4 any update:            480ms (weightier, "coronation")    */
-  /*    everything else:          cfg.slotDurationMs (380ms default) */
-  /*  Computed during render so the SlotNumber sees the right value  */
-  /*  on the exact render that triggers the slot roll. lastCountRef  */
-  /*  and hasFirstSelectedRef are still at their PRE-effect values   */
-  /*  here, so this expression is correctly true on the very render   */
-  /*  that needs the longer animation.                               */
-  /* =============================================================== */
-  const isFirstSelectionRender =
-    lastCountRef.current === 0 &&
-    selectionCount === 1 &&
-    !hasFirstSelectedRef.current &&
-    !reduced;
-  const oddsSlotDurationMs = isFirstSelectionRender
-    ? cfg.tier1.firstSelectionCountUp.slotDurationMs
-    : tier === 4
-      ? cfg.tier4.slotDurationMs
-      : cfg.slotDurationMs;
+  // Entry amount + potential winnings come from the centralized
+  // selection-count config (buttonProgressionConfig.slipEntry) — NOT
+  // derived from odds. Odds are no longer displayed on the pill at all.
+  const { amount: entryAmount, potentialWin: entryPotentialWin } = useMemo(
+    () => getSlipEntryValues(selectionCount),
+    [selectionCount],
+  );
+  // EXPLORATION — next step's fixed values, for the 'peek'/'ladder' variants.
+  const nextEntry = useMemo(
+    () => getNextSlipEntryValues(selectionCount),
+    [selectionCount],
+  );
+  const ctaDisabled = !canConfirmEntry(selectionCount);
 
   /* =============================================================== */
   /*  Inner CTA press handler — placeholder                          */
@@ -1206,24 +1179,31 @@ export function ButtonPreviewMomios({
               palettes so only the shell bg changes. */}
           <motion.div
             ref={shellRef}
-            className="relative flex h-[56px] w-full items-center overflow-hidden rounded-[56px] border border-[#4b20ff]"
+            className="relative flex h-[56px] w-full items-center overflow-hidden rounded-[56px] border"
             style={{
               // Base background — always the flat #191919. The T2/T3 purple
-              // gradient is layered above via a crossfading motion.div so
+              // gradient (or, below `minSelections`, the Figma empty-state
+              // border) is layered above via a crossfading motion.div so
               // tier transitions don't snap.
               background: '#191919',
+              // Figma empty-state (node 20215:22003) border —
+              // fillopacitysecondary — vs. the active pill's purple border.
+              borderColor: ctaDisabled ? 'rgba(251,251,251,0.24)' : '#4b20ff',
             }}
           >
-            {/* Purple background gradient overlay. Originally only shown at
-                T2/T3 (leaving T0/T1 flat #191919 gray); now always on so the
-                collapsed pill is purple regardless of selection count — it
-                should match the multi-selection look at every tier. */}
+            {/* Background gradient overlay. Below `minSelections` this is
+                the Figma empty-state neutral gradient (node 20215:22003:
+                #191919 → #0f0f0f, same token as BetSlipFullSheet's
+                SHEET_BG); otherwise the purple pill gradient, always on so
+                the collapsed pill matches the multi-selection look at
+                every tier. */}
             <motion.div
               aria-hidden
               className="pointer-events-none absolute inset-0"
               style={{
-                background:
-                  'linear-gradient(to right, #14083d 0%, #230c3e 58%, #5224f1 100%)',
+                background: ctaDisabled
+                  ? 'linear-gradient(to bottom, #191919 0%, #0f0f0f 100%)'
+                  : 'linear-gradient(to right, #14083d 0%, #230c3e 58%, #5224f1 100%)',
               }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -1354,14 +1334,23 @@ export function ButtonPreviewMomios({
             </AnimatePresence>
 
             {/* ============================================ */}
-            {/*  CONTENT ROW — Bets / Momio / Monto / Gana   */}
+            {/*  CONTENT ROW — below `minSelections`, matches the Figma    */}
+            {/*  empty-state reference exactly (node 20215:22003: Selec./  */}
+            {/*  Monto only, both at 24% opacity, no Gana field); at       */}
+            {/*  `minSelections`+ it's Bets / Monto / Gana. Odds ("Momio") */}
+            {/*  are never displayed — the entry amount and potential      */}
+            {/*  winnings are read from the centralized selection-count   */}
+            {/*  config, not the odds.                                    */}
             {/* ============================================ */}
             <div className="relative flex h-full flex-1 items-center gap-3 pl-5 pr-2">
-              {/* BETS count with count-pulse on update */}
+              {/* SELECTIONS count with count-pulse on update. Figma's
+                  empty-state label is "Selec." (not "Bet"/"Bets") and the
+                  whole field sits at 24% opacity. */}
               <motion.div
                 className="flex flex-col items-start justify-center"
                 animate={countControls}
                 initial={{ scale: 1 }}
+                style={{ opacity: ctaDisabled ? 0.24 : 1 }}
               >
                 <motion.div
                   className="flex h-[21px] items-center"
@@ -1401,97 +1390,36 @@ export function ButtonPreviewMomios({
                     color: 'rgba(251,251,251,0.5)',
                   }}
                 >
-                  {selectionCount === 1 ? 'Bet' : 'Bets'}
+                  {ctaDisabled ? 'Selec.' : selectionCount === 1 ? 'Bet' : 'Bets'}
                 </p>
               </motion.div>
 
-              {/* MOMIO — layered: heat-haze + glow halo + real text with all
-                  transforms (slot, pulse, settle, fire, char wave, burst) */}
-              <div className="flex flex-col items-start justify-center">
-                <div className="relative flex h-[21px] items-center">
-                  {/* REGRESSION FIX — All duplicate text elements REMOVED.
-                      The glow is text-shadow only, applied to the real text
-                      below via a drop-shadow filter (`oddsGlowFilter`).
-                      Smoke variant still renders blob shapes BEHIND the text
-                      (not duplicate text), which is allowed. */}
-                  {tier >= 3 && !reduced && tier3OddsEffect === 'smoke' && (
-                    <OddsSmokeEffect />
-                  )}
-                  {/* Real momio value — wrapped in two motion layers:
-                      outer = T3 add burst (scale 1.08)
-                      inner = post-slot settle overshoot (scale 1.04)
-                      The text-shadow stack is applied here via motion value. */}
-                  <motion.div
-                    className="relative flex items-center gap-1"
-                    animate={oddsBurstControls}
-                    initial={{ scale: 1 }}
-                    style={{
-                      scale: oddsPulseScale,
-                      opacity: oddsPulseOpacity,
-                      y: weightAnchorY,
-                      // Glow is T3-ONLY. T0/T1/T2 = plain text.
-                      // T3 — Figma "Black Italic" number style (900 + italic).
-                      fontFamily: 'Red Hat Display, sans-serif',
-                      fontWeight: 900,
-                      fontStyle: tier >= 3 ? 'italic' : 'normal',
-                      fontSize: 14,
-                      lineHeight: '21px',
-                      color: '#fbfbfb',
-                    }}
-                  >
-                    <motion.span
-                      animate={oddsSettleControls}
-                      initial={{ scale: 1 }}
-                      // Purple drop-shadow halo stays REMOVED at T3.
-                      // T4 adds a subtle WHITE drop-shadow glow on the
-                      // Momio digits — same `numberGlow` filter used on
-                      // Bets / Monto / Gana so all four numbers read as
-                      // a quietly luminous set at T4.
-                      style={{
-                        display: 'inline-block',
-                        filter: tier === 4 ? cfg.tier4.numberGlow : 'none',
-                      }}
-                    >
-                      <SlotNumber
-                        value={oddsLabel}
-                        durationMs={oddsSlotDurationMs}
-                        reducedMotion={reduced}
-                        innerCharClassName={
-                          tier >= 3 && !reduced
-                            ? `fire-shimmer odds-char-wave${
-                                speedScale > 1 ? ' fire-shimmer-slow' : ''
-                              }`
-                            : ''
-                        }
-                      />
-                    </motion.span>
-                    {/* Odds ripples (T3 only) — ghost copies of the digit
-                        string overlaying the SlotNumber, scaling outward
-                        and fading on every selection add. Inherits font
-                        from the parent so the ghost glyphs line up. */}
-                    <AnimatePresence>
-                      {!reduced &&
-                        oddsRipples.map((r) => (
-                          <OddsRipple key={r.id} id={r.id} text={r.text} />
-                        ))}
-                    </AnimatePresence>
-                  </motion.div>
-                </div>
-                <p
-                  style={{
-                    fontFamily: 'Red Hat Display, sans-serif',
-                    fontWeight: 500,
-                    fontSize: 12,
-                    lineHeight: '16px',
-                    color: 'rgba(251,251,251,0.5)',
-                  }}
-                >
-                  Momio
-                </p>
-              </div>
-
-              {/* MONTO */}
-              <div className="flex flex-col items-start justify-center">
+              {/* MONTO — entry amount, read from the centralized
+                  selection-count config (see getSlipEntryValues). Dims to
+                  the Figma empty-state 24% opacity below `minSelections`.
+                  EXPLORATION (`explore/fixed-entry-values-ui`): the label
+                  and a lock glyph vary by `fixedEntryVariant` to signal the
+                  value is fixed/non-editable; 'peek' also anchors the
+                  transient "next step" tooltip here. */}
+              <div
+                className="relative flex flex-col items-start justify-center"
+                style={{ opacity: ctaDisabled ? 0.24 : 1 }}
+              >
+                {fixedEntryVariant === 'peek' && (
+                  <AnimatePresence>
+                    {showNextPeek && nextEntry && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        transition={{ duration: 0.18 }}
+                        className="absolute -top-[30px] left-0 z-10 whitespace-nowrap rounded-full bg-[#161616] px-2 py-1 text-[10px] font-bold text-[#fbfbfb] shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                      >
+                        +1 sel. → ${nextEntry.amount} · gana ${nextEntry.potentialWin}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
                 <p
                   style={{
                     fontFamily: 'Red Hat Display, sans-serif',
@@ -1505,7 +1433,10 @@ export function ButtonPreviewMomios({
                     filter: tier === 4 ? cfg.tier4.numberGlow : 'none',
                   }}
                 >
-                  ${stake}
+                  {fixedEntryVariant === 'level' && (
+                    <span className="mr-0.5 text-[10px] opacity-60">🔒</span>
+                  )}
+                  ${entryAmount}
                 </p>
                 <p
                   style={{
@@ -1516,92 +1447,199 @@ export function ButtonPreviewMomios({
                     color: 'rgba(251,251,251,0.5)',
                   }}
                 >
-                  Monto
+                  {fixedEntryVariant === 'peek' ? 'Monto fijo' : 'Monto'}
                 </p>
               </div>
-            </div>
 
-            {/* RIGHT — Gana CTA (potential winnings) */}
-            <div className="relative flex h-[56px] w-[112px] shrink-0 items-center justify-center p-[6px]">
-              <div
-                className="relative flex h-full w-full flex-col items-center justify-center rounded-[100px] px-[6px]"
-                style={{
-                  // T2/T3 — Figma "Buscador" CTA look: brighter gradient
-                  // end (#a954ff) gives the glow feel; subtle depth shadow
-                  // adds dimension. T0/T1 keep the original gradient.
-                  backgroundImage:
-                    tier >= 2
-                      ? 'linear-gradient(59.98deg, #4b20ff 0%, #a954ff 100%)'
-                      : 'linear-gradient(58.9deg, #4b20ff 0%, #9730ff 100%)',
-                  boxShadow:
-                    tier >= 2
-                      ? 'inset 0 0 12px rgba(0,0,0,0.24), 0 2px 6px rgba(29,11,68,0.3)'
-                      : 'inset 0 0 12px rgba(0,0,0,0.24)',
-                }}
-              >
-                <motion.div
-                  className="relative flex items-center"
-                  style={{
-                    fontFamily: 'Red Hat Display, sans-serif',
-                    fontWeight: 900,
-                    // T3 — Figma "Black Italic" number style.
-                    fontStyle: tier >= 3 ? 'italic' : 'normal',
-                    fontSize: 14,
-                    lineHeight: '21px',
-                    color: '#fbfbfb',
-                    // Glow as a drop-shadow FILTER (not text-shadow) so it
-                    // hugs the glyphs instead of clipping into boxes. At
-                    // T4 the purple breath-halo is replaced by the same
-                    // subtle white glow used on the other three numbers
-                    // — so the whole numeric set reads as one luminous
-                    // group with the gold sweep on top.
-                    filter:
-                      tier === 4
-                        ? cfg.tier4.numberGlow
-                        : tier >= 3
-                          ? ganaGlowFilter
-                          : 'none',
-                  }}
-                >
-                  <SlotNumber
-                    value={`$${potentialWin}`}
-                    reducedMotion={reduced}
-                    innerCharClassName={
-                      tier >= 3 && !reduced
-                        ? // Same lavender-white sweeping wave at T3 AND T4
-                          // (the gold variant was tried at T4 and reverted).
-                          // The .fire-shimmer-gold CSS class stays in
-                          // index.css unused, in case we revisit.
-                          `fire-shimmer odds-char-wave${
-                            speedScale > 1 ? ' fire-shimmer-slow' : ''
-                          }`
-                        : ''
-                    }
-                  />
-                </motion.div>
-                <div className="flex items-center justify-center gap-1 pl-1.5">
+              {/* MIDDLE COLUMN — 'peek': unchanged "Acierta N/N". 'ladder':
+                  the numeric text is replaced by a mini step ladder (dots
+                  for each configured selection count, current one
+                  highlighted) so the "you're on a fixed step, adding one
+                  more moves you to the next" idea reads visually. 'level':
+                  reframed as "Nivel N" (N = step index from
+                  `minSelections`), with a badge-pop replay on every
+                  increase. Only shown once the entry is active (2+) — the
+                  Figma empty-state pill (below `minSelections`) has no
+                  equivalent third field at all, see the disabled CTA
+                  above. */}
+              {!ctaDisabled && (
+                <div className="flex flex-col items-start justify-center">
+                  {fixedEntryVariant === 'ladder' ? (
+                    <div className="flex h-[21px] items-center gap-[3px]">
+                      {Array.from(
+                        {
+                          length:
+                            cfg.maxSelections -
+                            cfg.slipEntry.minSelections +
+                            1,
+                        },
+                        (_, i) => i + cfg.slipEntry.minSelections,
+                      ).map((step) => (
+                        <div
+                          key={step}
+                          className="rounded-full transition-all duration-150"
+                          style={{
+                            width: step === selectionCount ? 6 : 4,
+                            height: step === selectionCount ? 6 : 4,
+                            background:
+                              step === selectionCount
+                                ? '#fbfbfb'
+                                : step < selectionCount
+                                  ? 'rgba(251,251,251,0.6)'
+                                  : 'rgba(251,251,251,0.24)',
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p
+                      key={fixedEntryVariant === 'level' ? `level-${selectionCount}` : undefined}
+                      className={
+                        fixedEntryVariant === 'level'
+                          ? 'animate-[badgePop_0.4s_ease-out]'
+                          : undefined
+                      }
+                      style={{
+                        fontFamily: 'Red Hat Display, sans-serif',
+                        fontWeight: 900,
+                        fontStyle: tier >= 3 ? 'italic' : 'normal',
+                        fontSize: 14,
+                        lineHeight: '21px',
+                        color: '#fbfbfb',
+                        filter: tier === 4 ? cfg.tier4.numberGlow : 'none',
+                      }}
+                    >
+                      {fixedEntryVariant === 'level'
+                        ? `Nivel ${selectionCount - cfg.slipEntry.minSelections + 1}`
+                        : `${selectionCount}/${selectionCount}`}
+                    </p>
+                  )}
                   <p
                     style={{
                       fontFamily: 'Red Hat Display, sans-serif',
                       fontWeight: 500,
                       fontSize: 12,
                       lineHeight: '16px',
+                      color: 'rgba(251,251,251,0.5)',
+                    }}
+                  >
+                    {fixedEntryVariant === 'level' ? 'Nivel' : 'Acierta'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT — Gana CTA (potential winnings), or, below
+                `minSelections`, the Figma empty-state button (node
+                20215:22017/22019: border-only pill, no fill, "Haz mín. 2
+                selec." / "Haz 1 selección"). Entry creation itself is
+                gated in the confirm/submit flow (BetSlipFullSheet +
+                App.tsx) — this is the visual half. */}
+            <div className="relative flex h-[56px] w-[112px] shrink-0 items-center justify-center p-[6px]">
+              {ctaDisabled ? (
+                <div
+                  aria-disabled
+                  className="flex h-full w-full flex-col items-center justify-center rounded-[100px] border px-[6px]"
+                  style={{ borderColor: 'rgba(251,251,251,0.16)' }}
+                >
+                  <p
+                    className="text-center"
+                    style={{
+                      fontFamily: 'Red Hat Display, sans-serif',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      lineHeight: '18px',
                       color: '#fbfbfb',
                     }}
                   >
-                    Gana
+                    {selectionCount === 0 ? 'Haz mín. 2 selec.' : 'Haz 1 selección'}
                   </p>
-                  <svg viewBox="0 0 14 14" width="10" height="10" fill="none" aria-hidden>
-                    <path
-                      d="M5 3l4 4-4 4"
-                      stroke="#fbfbfb"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="relative flex h-full w-full flex-col items-center justify-center rounded-[100px] px-[6px]"
+                  style={{
+                    // T2/T3 — Figma "Buscador" CTA look: brighter gradient
+                    // end (#a954ff) gives the glow feel; subtle depth
+                    // shadow adds dimension. T0/T1 keep the original
+                    // gradient.
+                    backgroundImage:
+                      tier >= 2
+                        ? 'linear-gradient(59.98deg, #4b20ff 0%, #a954ff 100%)'
+                        : 'linear-gradient(58.9deg, #4b20ff 0%, #9730ff 100%)',
+                    boxShadow:
+                      tier >= 2
+                        ? 'inset 0 0 12px rgba(0,0,0,0.24), 0 2px 6px rgba(29,11,68,0.3)'
+                        : 'inset 0 0 12px rgba(0,0,0,0.24)',
+                  }}
+                >
+                  <motion.div
+                    className="relative flex items-center"
+                    style={{
+                      fontFamily: 'Red Hat Display, sans-serif',
+                      fontWeight: 900,
+                      // T3 — Figma "Black Italic" number style.
+                      fontStyle: tier >= 3 ? 'italic' : 'normal',
+                      fontSize: 14,
+                      lineHeight: '21px',
+                      color: '#fbfbfb',
+                      // Glow as a drop-shadow FILTER (not text-shadow) so it
+                      // hugs the glyphs instead of clipping into boxes. At
+                      // T4 the purple breath-halo is replaced by the same
+                      // subtle white glow used on the other three numbers
+                      // — so the whole numeric set reads as one luminous
+                      // group with the gold sweep on top.
+                      filter:
+                        tier === 4
+                          ? cfg.tier4.numberGlow
+                          : tier >= 3
+                            ? ganaGlowFilter
+                            : 'none',
+                    }}
+                  >
+                    {fixedEntryVariant === 'level' && (
+                      <span className="mr-0.5 text-[10px] opacity-70">🔒</span>
+                    )}
+                    <SlotNumber
+                      value={`$${entryPotentialWin}`}
+                      reducedMotion={reduced}
+                      innerCharClassName={
+                        tier >= 3 && !reduced
+                          ? // Same lavender-white sweeping wave at T3 AND T4
+                            // (the gold variant was tried at T4 and reverted).
+                            // The .fire-shimmer-gold CSS class stays in
+                            // index.css unused, in case we revisit.
+                            `fire-shimmer odds-char-wave${
+                              speedScale > 1 ? ' fire-shimmer-slow' : ''
+                            }`
+                          : ''
+                      }
+                    />
+                  </motion.div>
+                  <div className="flex items-center justify-center gap-1 pl-1.5">
+                    <p
+                      style={{
+                        fontFamily: 'Red Hat Display, sans-serif',
+                        fontWeight: 500,
+                        fontSize: 12,
+                        lineHeight: '16px',
+                        color: '#fbfbfb',
+                      }}
+                    >
+                      Gana
+                    </p>
+                    <svg viewBox="0 0 14 14" width="10" height="10" fill="none" aria-hidden>
+                      <path
+                        d="M5 3l4 4-4 4"
+                        stroke="#fbfbfb"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
           {/* T3 fire sparks — rising embers emitted from the TOP of the

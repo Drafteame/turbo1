@@ -12,12 +12,17 @@ import boosterIllus from './assets/booster.png';
 import chevronRightIcon from './assets/chevron_right.svg';
 import clockIcon from './assets/clock.svg';
 import closeIcon from './assets/close.svg';
-import editIcon from './assets/edit.svg';
 import freebetIllus from './assets/freebet.png';
-import shieldIcon from './assets/shield.svg';
+import playerIcon from './assets/player.svg';
 import trashIcon from './assets/trash.svg';
+import {
+  buttonProgressionConfig as cfg,
+  canConfirmEntry,
+  getNextSlipEntryValues,
+  getSlipEntryValues,
+} from './buttonProgressionConfig';
 import { SwipeToConfirm } from './SwipeToConfirm';
-import type { Selection } from './types';
+import type { FixedEntryVariant, Selection } from './types';
 
 /**
  * BetSlipFullSheet — the "Resumen de tu entrada" floating card.
@@ -31,18 +36,16 @@ import type { Selection } from './types';
  * collapses the underlying bet slip (onClose).
  *
  * Includes: header (delete-all trash + × + count + balance), scrollable
- * selections list, Monto/Momio/Ganancia footer, the free-bet/Booster promos
- * box, the "accept odds changes" checkbox, and swipe-to-play. Toggle switches
- * and the checkbox are CSS controls. STILL PENDING one asset: the countdown
+ * selections list, Monto/Ganancia footer (entry amount + potential
+ * winnings, from the centralized selection-count config — not odds, not
+ * user-editable), the free-bet/Booster promos box, and swipe-to-play.
+ * Toggle switches are CSS controls. STILL PENDING one asset: the countdown
  * clock icon — the countdown pills currently show the time text without it.
  *
  * Assets: close.svg (× + per-row remove), shield.svg (team placeholder),
- * edit.svg (Monto), chevron_right.svg (swipe thumb + Booster caret),
- * trash.svg (delete-all), freebet.png / booster.png (promo illustrations).
+ * chevron_right.svg (swipe thumb + Booster caret), trash.svg (delete-all),
+ * freebet.png / booster.png (promo illustrations).
  */
-
-const STAKE = 200;
-const fmtOdds = (n: number) => `${n.toFixed(2)}x`;
 
 const CLOSE_OFFSET_PX = 120;
 const CLOSE_VELOCITY = 550;
@@ -88,7 +91,6 @@ const PILL_BORDER = '#4b20ff';
 
 type Props = {
   selections: Selection[];
-  cumulativeOdds: number;
   onRemove: (id: string) => void;
   /** Delete-all (trash) — clears the whole slip. */
   onClearAll: () => void;
@@ -96,17 +98,26 @@ type Props = {
   onClose: () => void;
   /** Swipe-to-play — places the bet. */
   onConfirm: () => void;
+  /** EXPLORATION (`explore/fixed-entry-values-ui`) — which fixed-entry-values
+      treatment the footer shows. Default 'peek'. */
+  fixedEntryVariant?: FixedEntryVariant;
 };
 
 export function BetSlipFullSheet({
   selections,
-  cumulativeOdds,
   onRemove,
   onClearAll,
   onClose,
   onConfirm,
+  fixedEntryVariant = 'peek',
 }: Props) {
-  const potentialWin = Math.round(cumulativeOdds * STAKE);
+  // Entry amount + potential winnings — centralized selection-count config,
+  // not derived from odds (see buttonProgressionConfig's `slipEntry`).
+  const { amount, potentialWin } = getSlipEntryValues(selections.length);
+  const canConfirm = canConfirmEntry(selections.length);
+  // EXPLORATION — next step's fixed values, for the 'peek'/'ladder' variants.
+  const nextEntry = getNextSlipEntryValues(selections.length);
+  const levelIndex = selections.length - cfg.slipEntry.minSelections + 1;
   const orderedSelections = [...selections].reverse(); // latest first
 
   // SHAPE MORPH — the card grows out of the slip footprint on open and shrinks
@@ -366,12 +377,12 @@ export function BetSlipFullSheet({
                 </button>
                 <div className="h-10 w-px bg-[rgba(251,251,251,0.16)]" />
               </div>
-              {/* team + text */}
+              {/* player placeholder + text */}
               <div className="flex min-w-px flex-1 items-center gap-[6px] px-[6px] py-2">
                 <div className="flex size-11 shrink-0 items-center justify-center">
                   <div className="size-9 overflow-hidden rounded-[8px] backdrop-blur-[2px]">
                     <img
-                      src={shieldIcon}
+                      src={playerIcon}
                       alt=""
                       className="size-full object-contain p-[3px]"
                     />
@@ -389,56 +400,162 @@ export function BetSlipFullSheet({
                   </p>
                 </div>
               </div>
-              {/* odds */}
-              <div className="flex w-[85px] shrink-0 items-center justify-end pl-1 pr-3">
-                <span className="text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
-                  {fmtOdds(sel.odds)}
-                </span>
-              </div>
             </div>
           ))}
         </div>
 
-        {/* FOOTER — Monto / Momio / Ganancia + swipe to play. */}
+        {/* FOOTER — Monto / Acierta N/N (or "Nivel N") / Ganancia: a plain
+            stat bar (one shared surface + thin vertical dividers, no
+            per-field borders or floating-label chips), so it reads as a
+            read-only summary rather than a row of editable text inputs.
+            Values come from the centralized selection-count config; not
+            editable, not derived from odds. "Acierta N/N" — a parlay needs
+            every selection to hit, so it's always
+            selections.length/selections.length; below the 2-selection
+            minimum it shows an inactive "—/—" instead of implying a valid
+            entry could already be placed.
+            EXPLORATION (`explore/fixed-entry-values-ui`): `fixedEntryVariant`
+            adds a below-the-bar row making the "fixed step, next step"
+            idea explicit — a next-step caption ('peek'), a labeled step
+            ladder ('ladder'), or a level progress bar ('level'). */}
         <div className="flex shrink-0 flex-col gap-3 border-t border-[rgba(251,251,251,0.16)] px-[10px] pb-2 pt-[10px]">
-          <div className="flex h-[59px] items-center gap-2">
+          <div className="flex h-[64px] items-stretch overflow-hidden rounded-[12px] bg-[rgba(251,251,251,0.04)]">
             {/* Monto */}
-            <div className="relative flex min-w-px flex-1 flex-col items-center pt-[11px]">
-              <div className="flex h-12 w-full items-center gap-2 overflow-hidden rounded-[12px] border border-[rgba(251,251,251,0.16)] p-3">
-                <img src={editIcon} alt="" className="size-3.5" />
-                <p className="min-w-px flex-1 text-[16px] font-medium leading-6 text-[#fbfbfb]">
-                  ${STAKE}
-                </p>
-              </div>
-              <div className="absolute left-2 top-0 flex items-center rounded-[4px] bg-[#121212] px-1.5 py-0.5">
-                <span className="text-[14px] font-medium leading-[21px] text-[rgba(251,251,251,0.5)]">
-                  Monto
-                </span>
-              </div>
-            </div>
-            {/* Momio */}
-            <div className="flex min-w-px flex-1 flex-col items-center justify-center py-0.5">
-              <span className="text-[14px] font-medium leading-[21px] text-[rgba(251,251,251,0.5)]">
-                Momio
+            <div className="flex min-w-px flex-1 flex-col items-center justify-center gap-0.5">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[rgba(251,251,251,0.5)]">
+                {fixedEntryVariant === 'peek' ? 'Monto fijo' : 'Monto'}
               </span>
-              <span className="text-[14px] font-black leading-[21px] text-[#fbfbfb]">
-                {fmtOdds(cumulativeOdds)}
+              <span className="text-[16px] font-bold leading-6 text-[#fbfbfb]">
+                {fixedEntryVariant === 'level' && (
+                  <span className="mr-0.5 text-[11px] opacity-60">🔒</span>
+                )}
+                ${amount}
               </span>
             </div>
+            <div className="my-3 w-px shrink-0 bg-[rgba(251,251,251,0.12)]" />
+            {/* Acierta N/N / Nivel N */}
+            <div
+              className="flex min-w-px flex-1 flex-col items-center justify-center gap-0.5"
+              style={{ opacity: canConfirm ? 1 : 0.4 }}
+            >
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[rgba(251,251,251,0.5)]">
+                {fixedEntryVariant === 'level' ? 'Nivel' : 'Acierta'}
+              </span>
+              <span
+                key={
+                  fixedEntryVariant === 'level'
+                    ? `level-${selections.length}`
+                    : undefined
+                }
+                className={
+                  'text-[16px] font-bold leading-6 text-[#fbfbfb]' +
+                  (fixedEntryVariant === 'level'
+                    ? ' inline-block animate-[badgePop_0.4s_ease-out]'
+                    : '')
+                }
+              >
+                {!canConfirm
+                  ? '—/—'
+                  : fixedEntryVariant === 'level'
+                    ? `${levelIndex}`
+                    : `${selections.length}/${selections.length}`}
+              </span>
+            </div>
+            <div className="my-3 w-px shrink-0 bg-[rgba(251,251,251,0.12)]" />
             {/* Ganancia */}
-            <div className="relative flex min-w-px flex-1 flex-col items-center pt-[11px]">
-              <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded-[12px] border border-[rgba(251,251,251,0.12)] p-3">
-                <p className="text-[16px] font-bold leading-6 text-[#fbbf24]">
-                  ${potentialWin}
-                </p>
-              </div>
-              <div className="absolute left-2 top-0 flex items-center rounded-[4px] bg-[#121212] px-1.5 py-0.5">
-                <span className="text-[14px] font-medium leading-[21px] text-[rgba(251,251,251,0.5)]">
-                  Ganancia
-                </span>
-              </div>
+            <div className="flex min-w-px flex-1 flex-col items-center justify-center gap-0.5">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[rgba(251,251,251,0.5)]">
+                {fixedEntryVariant === 'peek' ? 'Ganancia fija' : 'Ganancia'}
+              </span>
+              <span className="text-[16px] font-bold leading-6 text-[#fbbf24]">
+                {fixedEntryVariant === 'level' && (
+                  <span className="mr-0.5 text-[11px] opacity-70">🔒</span>
+                )}
+                ${potentialWin}
+              </span>
             </div>
           </div>
+
+          {/* EXPLORATION — 'peek': next-step caption. Hidden once there's no
+              next step (already at `maxSelections`) or below the minimum
+              (nothing to "add one more" from yet, that's what the empty/1
+              state copy below already covers). */}
+          {fixedEntryVariant === 'peek' && canConfirm && nextEntry && (
+            <p className="-mt-1 text-center text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.6)]">
+              🔒 Fijo para {selections.length} selecciones — agrega 1 más → $
+              {nextEntry.amount} · gana ${nextEntry.potentialWin}
+            </p>
+          )}
+
+          {/* EXPLORATION — 'ladder': the full step ladder (every configured
+              selection count from `minSelections` to `maxSelections`), each
+              step showing its own fixed $ amount. Makes "adding a selection
+              moves you to the next predefined amount" visible as a single
+              picture rather than two numbers you have to compare mentally. */}
+          {fixedEntryVariant === 'ladder' && (
+            <div className="-mt-1 flex items-start justify-between gap-0.5">
+              {Array.from(
+                {
+                  length: cfg.maxSelections - cfg.slipEntry.minSelections + 1,
+                },
+                (_, i) => i + cfg.slipEntry.minSelections,
+              ).map((step) => {
+                const stepValues = getSlipEntryValues(step);
+                const isCurrent = step === selections.length;
+                const isPast = step < selections.length;
+                return (
+                  <div
+                    key={step}
+                    className="flex flex-1 flex-col items-center gap-1"
+                  >
+                    <div
+                      className="rounded-full transition-all duration-150"
+                      style={{
+                        width: isCurrent ? 8 : 6,
+                        height: isCurrent ? 8 : 6,
+                        background: isCurrent
+                          ? '#a954ff'
+                          : isPast
+                            ? 'rgba(169,84,255,0.6)'
+                            : 'rgba(251,251,251,0.24)',
+                      }}
+                    />
+                    <span
+                      className="text-[10px] font-bold leading-3"
+                      style={{
+                        color: isCurrent ? '#fbfbfb' : 'rgba(251,251,251,0.4)',
+                      }}
+                    >
+                      ${stepValues.amount}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* EXPLORATION — 'level': a slim level-progress bar reinforcing
+              "Nivel N" above with "N de MAX" and a filled track. */}
+          {fixedEntryVariant === 'level' && canConfirm && (
+            <div className="-mt-1 flex items-center gap-2">
+              <div className="h-1 min-w-px flex-1 overflow-hidden rounded-full bg-[rgba(251,251,251,0.12)]">
+                <div
+                  className="h-full rounded-full bg-[#a954ff] transition-[width] duration-300 ease-out"
+                  style={{
+                    width: `${
+                      (levelIndex /
+                        (cfg.maxSelections - cfg.slipEntry.minSelections + 1)) *
+                      100
+                    }%`,
+                  }}
+                />
+              </div>
+              <span className="shrink-0 text-[11px] font-medium text-[rgba(251,251,251,0.5)]">
+                Nivel {levelIndex} de{' '}
+                {cfg.maxSelections - cfg.slipEntry.minSelections + 1}
+              </span>
+            </div>
+          )}
 
           {/* Promos — free bet + Booster. Toggles are CSS controls; the
               countdown clock glyph is still pending its asset. */}
@@ -519,25 +636,26 @@ export function BetSlipFullSheet({
             </div>
           </div>
 
-          {/* Accept odds changes — CSS checkbox. */}
-          <button
-            type="button"
-            onPointerDownCapture={(e) => e.stopPropagation()}
-            className="flex items-center gap-3 px-3.5 active:opacity-70"
-          >
-            <div className="size-5 shrink-0 rounded-[6px] border-2 border-[rgba(251,251,251,0.3)]" />
-            <p className="text-left text-[14px] font-medium leading-[21px] text-[rgba(251,251,251,0.7)]">
-              Acepta siempre el cambio de momios.{' '}
-              <span className="underline">Más info.</span>
+          {/* Minimum-selection notice — only reachable if this sheet is
+              opened at exactly 1 selection (tapping the pill). */}
+          {!canConfirm && (
+            <p className="px-3.5 text-center text-[13px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
+              Agrega al menos 2 selecciones para crear tu apuesta.
             </p>
-          </button>
+          )}
 
           {/* Swipe to play — shared component (same as the summarized slip),
               at 44px height. `data-scroll` keeps the sheet close-drag from
               starting here WITHOUT stopping the pointerdown from reaching the
-              swipe thumb (which owns the horizontal drag gesture). */}
+              swipe thumb (which owns the horizontal drag gesture). Disabled
+              below the 2-selection minimum. */}
           <div data-scroll>
-            <SwipeToConfirm stake={STAKE} onConfirm={onConfirm} heightPx={44} />
+            <SwipeToConfirm
+              stake={amount}
+              onConfirm={onConfirm}
+              heightPx={44}
+              disabled={!canConfirm}
+            />
           </div>
         </div>
       </motion.div>

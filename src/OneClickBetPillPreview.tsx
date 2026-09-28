@@ -29,8 +29,6 @@ export function OneClickBetPillPreview() {
             <p className="text-[11px] font-medium text-[rgba(251,251,251,0.5)]">{row.label}</p>
             <OneClickBetPill
               odds={1.75}
-              amount={200}
-              potentialWin={350}
               state={row.state}
               progress={row.progress}
             />

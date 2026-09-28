@@ -39,6 +39,32 @@ export const buttonProgressionConfig = {
   animationsEnabled: false as boolean,
   // Cap selections at this count to prevent runaway tiers.
   maxSelections: 8,
+
+  /* --------------------------------------------------------------- */
+  /*  SLIP ENTRY VALUES — indexed by selection count (2–8)            */
+  /*  PROTOTYPE VALUES (MXN) — mock working numbers for this          */
+  /*  exploration, NOT derived from odds. The bet slip, the pill, and */
+  /*  the "Resumen" full sheet all read entry amount + potential      */
+  /*  winnings from here — one source, editable in one place. Below   */
+  /*  `minSelections` there is no entry (amount/winnings show as 0    */
+  /*  and entry creation is disabled in the UI). */
+  slipEntry: {
+    minSelections: 2,
+    byCount: {
+      2: { amount: 20, potentialWin: 40 },
+      3: { amount: 30, potentialWin: 75 },
+      4: { amount: 40, potentialWin: 120 },
+      5: { amount: 50, potentialWin: 175 },
+      6: { amount: 60, potentialWin: 240 },
+      7: { amount: 70, potentialWin: 315 },
+      8: { amount: 80, potentialWin: 400 },
+    } as Record<number, { amount: number; potentialWin: number }>,
+  },
+  // EXPLORATION (`explore/fixed-entry-values-ui`) — 'peek' variant's
+  // transient "next step" tooltip lifetime, shown on the collapsed pill.
+  fixedEntryPeek: {
+    durationMs: 1800,
+  },
   // Press feedback — scale on press, spring back on release (all tiers).
   pressScale: 0.97,
   // Slot animation duration for per-digit roll (selection count + odds).
@@ -722,3 +748,45 @@ export const buttonProgressionConfig = {
 } as const;
 
 export type ButtonProgressionConfig = typeof buttonProgressionConfig;
+
+/**
+ * Entry amount + potential winnings for a given selection count, per the
+ * centralized `slipEntry` config above. Below `minSelections` (2) there is no
+ * entry yet, so both values are 0 — the pill/slip/full-sheet all show that
+ * and disable confirmation, per the selection-count entry rules. Counts above
+ * the configured max (8, == `maxSelections`) clamp to the last configured
+ * row rather than reading undefined.
+ */
+export function getSlipEntryValues(selectionCount: number): {
+  amount: number;
+  potentialWin: number;
+} {
+  const { minSelections, byCount } = buttonProgressionConfig.slipEntry;
+  if (selectionCount < minSelections) return { amount: 0, potentialWin: 0 };
+  const maxConfigured = buttonProgressionConfig.maxSelections;
+  const count = Math.min(selectionCount, maxConfigured);
+  return byCount[count] ?? { amount: 0, potentialWin: 0 };
+}
+
+/** Shared gate: entry creation requires at least `minSelections` picks. */
+export function canConfirmEntry(selectionCount: number): boolean {
+  return selectionCount >= buttonProgressionConfig.slipEntry.minSelections;
+}
+
+/**
+ * EXPLORATION (`explore/fixed-entry-values-ui`) — the fixed amount/winnings
+ * for the NEXT selection count, or `null` once already at the configured max
+ * (nothing to advance to). Used only by the fixed-entry-values UI variants
+ * to preview "add one more selection → these are the next numbers" — never
+ * a real, addable value (adding is still driven by `Selection` picks).
+ */
+export function getNextSlipEntryValues(
+  selectionCount: number,
+): { count: number; amount: number; potentialWin: number } | null {
+  const maxConfigured = buttonProgressionConfig.maxSelections;
+  if (selectionCount >= maxConfigured) return null;
+  const { minSelections } = buttonProgressionConfig.slipEntry;
+  const nextCount = Math.max(selectionCount + 1, minSelections);
+  const { amount, potentialWin } = getSlipEntryValues(nextCount);
+  return { count: nextCount, amount, potentialWin };
+}

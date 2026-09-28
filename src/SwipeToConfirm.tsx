@@ -32,6 +32,9 @@ type Props = {
   onSwipeStart?: () => void;
   /** Track height in px (default 40). */
   heightPx?: number;
+  /** When true, the thumb can't be dragged and confirming is blocked
+   *  (e.g. below the slip's 2-selection minimum). Dims the track. */
+  disabled?: boolean;
 };
 
 export function SwipeToConfirm({
@@ -39,6 +42,7 @@ export function SwipeToConfirm({
   onConfirm,
   onSwipeStart,
   heightPx = 40,
+  disabled = false,
 }: Props) {
   // Thumb x → purple fill that grows across the track. The drag is constrained
   // by the track element itself, so the confirm gate is "thumb reached the far
@@ -81,8 +85,9 @@ export function SwipeToConfirm({
   return (
     <div
       ref={trackRef}
+      aria-disabled={disabled}
       className="relative flex w-full items-center overflow-hidden rounded-full bg-[rgba(240,242,244,0.12)] py-[2px] pl-[2px] pr-6"
-      style={{ height: heightPx }}
+      style={{ height: heightPx, opacity: disabled ? 0.5 : 1 }}
     >
       {/* Purple fill — grows with the thumb as the user swipes. */}
       <motion.div
@@ -93,18 +98,19 @@ export function SwipeToConfirm({
       <motion.button
         ref={thumbRef}
         type="button"
+        disabled={disabled}
         aria-label={
           confirming ? 'Creando entrada' : `Desliza para jugar por $${stake}`
         }
         className="absolute left-[2px] top-[2px] z-10 flex w-12 items-center justify-center rounded-full"
         style={{ x: swipeX, height: inner, backgroundImage: PURPLE_CTA }}
-        drag={confirming ? false : 'x'}
+        drag={confirming || disabled ? false : 'x'}
         dragConstraints={trackRef}
         dragElastic={0.12}
         dragMomentum={false}
         onDragStart={onSwipeStart}
         onDragEnd={handleThumbDragEnd}
-        whileTap={confirming ? undefined : { scale: 0.97 }}
+        whileTap={confirming || disabled ? undefined : { scale: 0.97 }}
       >
         {confirming ? (
           <span
