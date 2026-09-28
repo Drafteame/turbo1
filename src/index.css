@@ -1,0 +1,721 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Kill the browser's pull-to-refresh / overscroll bounce on the viewport
+   scroller. Swiping DOWN to collapse the bet slip was triggering the mobile
+   browser's native pull-to-refresh; `overscroll-behavior-y: none` disables it. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: 'Red Hat Display', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Matches the Figma newLeagueMarkets card background (pure black) so
+     the card and the surrounding chrome read as one continuous surface. */
+  background: #000000;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbar but keep functionality (inside phone frame) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+  /* Don't let a downward drag at the top of this inner scroller chain out to
+     the document (which would re-trigger pull-to-refresh). */
+  overscroll-behavior: contain;
+}
+
+/* ---------------------------------------------------------------- */
+/*  Tier 3 "fire" shimmer on the momio value                        */
+/*  Applied per-character so each digit gets its own gradient fill. */
+/*  Vertical light → lighter → light sweep on a 2s loop.            */
+/* ---------------------------------------------------------------- */
+@keyframes fireShimmer {
+  0% {
+    background-position: 50% 0%;
+  }
+  50% {
+    background-position: 50% 100%;
+  }
+  100% {
+    background-position: 50% 0%;
+  }
+}
+
+.fire-shimmer {
+  /* Light-lavender base + white-hot band so the moving band reads as a
+     BRIGHTENING wave (a white base can't get brighter). */
+  /* Base sits just below white (legible) so the #ffffff band still has
+     headroom to read as a brightening wave. Whiter base = more legible
+     but subtler wave; this is a balanced midpoint. */
+  background-image: linear-gradient(
+    180deg,
+    #ddd1f8 0%,
+    #ddd1f8 42%,
+    #ffffff 50%,
+    #ddd1f8 58%,
+    #ddd1f8 100%
+  );
+  background-size: 100% 300%;
+  background-position: 50% 0%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: fireShimmer 2s linear infinite;
+}
+
+.fire-shimmer-slow {
+  animation-duration: 6s; /* used when debug speedScale=3 */
+}
+
+
+/* ---------------------------------------------------------------- */
+/*  POLISH PASS — Tier 3 per-character brightness wave on the odds   */
+/*  A brief brightness spike runs L→R across each character every    */
+/*  3s, with 60ms stagger between chars. Per-char `--ci` comes from  */
+/*  SlotNumber's wrapper.                                            */
+/* ---------------------------------------------------------------- */
+@keyframes oddsCharBrightnessWave {
+  0% {
+    filter: brightness(1);
+  }
+  2% {
+    /* 60ms / 3000ms ≈ 2% — quick spike start */
+    filter: brightness(1.4);
+  }
+  4% {
+    /* 120ms / 3000ms = 4% — quick spike end */
+    filter: brightness(1);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.odds-char-wave {
+  animation: oddsCharBrightnessWave 3s linear infinite;
+  /* Stagger via SlotNumber's --ci. 60ms between adjacent chars. */
+  animation-delay: calc(var(--ci, 0) * 60ms);
+  display: inline-block;
+  will-change: filter;
+}
+
+/* When both classes are present, run the fire-shimmer sweep with a
+   per-character stagger so the white-hot band peaks char-by-char (L→R)
+   — the visible per-character brightness wave. */
+.fire-shimmer.odds-char-wave {
+  animation: fireShimmer 2s linear infinite;
+  /* Positive stagger → leftmost char peaks first, rightmost last (L→R). */
+  animation-delay: calc(var(--ci, 0) * 150ms);
+}
+
+.fire-shimmer-slow.odds-char-wave {
+  animation: fireShimmer 6s linear infinite;
+  animation-delay: calc(var(--ci, 0) * 450ms);
+}
+
+/* ---------------------------------------------------------------- */
+/*  TIER 4 — Gold sweeping-shine variant for the Gana CTA           */
+/*  Text BASE color stays white; only the moving band turns gold     */
+/*  (#FFD700) — so the digits read as plain white at rest and a      */
+/*  gold streak sweeps vertically through them on the same 2s loop   */
+/*  as the standard fire-shimmer.                                    */
+/* ---------------------------------------------------------------- */
+.fire-shimmer-gold {
+  background-image: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #ffffff 42%,
+    #ffd700 50%,
+    #ffffff 58%,
+    #ffffff 100%
+  );
+  background-size: 100% 300%;
+  background-position: 50% 0%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: fireShimmer 2s linear infinite;
+}
+
+.fire-shimmer-gold.odds-char-wave {
+  animation: fireShimmer 2s linear infinite;
+  animation-delay: calc(var(--ci, 0) * 150ms);
+}
+
+.fire-shimmer-slow.fire-shimmer-gold {
+  animation-duration: 6s;
+}
+.fire-shimmer-slow.fire-shimmer-gold.odds-char-wave {
+  animation: fireShimmer 6s linear infinite;
+  animation-delay: calc(var(--ci, 0) * 450ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fire-shimmer-gold {
+    animation: none;
+    /* Rest state = plain white, matching the rest of the text. */
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odds-char-wave,
+  .fire-shimmer.odds-char-wave {
+    animation: none;
+    filter: none;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/*  Outer glow — Siri / Apple-Intelligence style flowing color.     */
+/*  A conic gradient between #4b20ff and #9730ff whose angle spins   */
+/*  continuously, so (under heavy blur) the two purples flow and     */
+/*  morph into each other. Uses @property for a smooth angle tween.  */
+/* ---------------------------------------------------------------- */
+@property --glow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes glowSwirl {
+  to {
+    --glow-angle: 360deg;
+  }
+}
+
+.outer-glow-swirl {
+  background: conic-gradient(
+    from var(--glow-angle),
+    #4e7bff,
+    #9730ff,
+    #4e7bff,
+    #9730ff,
+    #4e7bff
+  );
+  animation: glowSwirl 7s linear infinite;
+}
+
+/* ---------------------------------------------------------------- */
+/*  T4 perimeter vignette — organic shape morph                     */
+/*  The mask ellipse's width, height, center, and inner-stop each    */
+/*  oscillate on slightly different phases over an 18s loop, so the  */
+/*  shape of the transparent "hole" in the perimeter glow gently     */
+/*  shifts — wider then taller then off-center, etc. — without the   */
+/*  changes being obvious frame-to-frame. Same trick the iOS 26 Siri */
+/*  activation uses: continuous rotation + subtle shape morph.       */
+/*                                                                    */
+/*  @property declarations give the custom properties typed values   */
+/*  so CSS interpolates them smoothly during the keyframe transitions.*/
+/* ---------------------------------------------------------------- */
+@property --vw {
+  syntax: '<percentage>';
+  initial-value: 75%;
+  inherits: false;
+}
+@property --vh {
+  syntax: '<percentage>';
+  initial-value: 80%;
+  inherits: false;
+}
+@property --vcx {
+  syntax: '<percentage>';
+  initial-value: 50%;
+  inherits: false;
+}
+@property --vcy {
+  syntax: '<percentage>';
+  initial-value: 50%;
+  inherits: false;
+}
+@property --vstop {
+  syntax: '<percentage>';
+  initial-value: 55%;
+  inherits: false;
+}
+
+@keyframes vignetteShapeBreathe {
+  /* 9 small steps + return-to-start = 8 transitions across the
+     loop. Each step changes each parameter by only ~2–6 pts so
+     the motion reads as a continuous wave rather than discrete
+     shape jumps. Width, height, and center each oscillate on
+     slightly different rhythms so no single axis "leads" — the
+     overall shape just gently undulates like a slow water wave. */
+  0%, 100% {
+    --vw: 78%;
+    --vh: 80%;
+    --vcx: 50%;
+    --vcy: 50%;
+    --vstop: 55%;
+  }
+  12% {
+    --vw: 83%;
+    --vh: 77%;
+    --vcx: 52%;
+    --vcy: 49%;
+    --vstop: 54%;
+  }
+  25% {
+    --vw: 81%;
+    --vh: 74%;
+    --vcx: 53%;
+    --vcy: 51%;
+    --vstop: 55%;
+  }
+  38% {
+    --vw: 75%;
+    --vh: 78%;
+    --vcx: 51%;
+    --vcy: 53%;
+    --vstop: 57%;
+  }
+  50% {
+    --vw: 73%;
+    --vh: 83%;
+    --vcx: 49%;
+    --vcy: 52%;
+    --vstop: 58%;
+  }
+  62% {
+    --vw: 76%;
+    --vh: 86%;
+    --vcx: 47%;
+    --vcy: 50%;
+    --vstop: 56%;
+  }
+  75% {
+    --vw: 81%;
+    --vh: 83%;
+    --vcx: 47%;
+    --vcy: 48%;
+    --vstop: 54%;
+  }
+  88% {
+    --vw: 84%;
+    --vh: 79%;
+    --vcx: 50%;
+    --vcy: 49%;
+    --vstop: 54%;
+  }
+}
+
+.vignette-shape-breathe {
+  -webkit-mask-image: radial-gradient(
+    ellipse var(--vw) var(--vh) at var(--vcx) var(--vcy),
+    transparent var(--vstop),
+    black 100%
+  );
+  mask-image: radial-gradient(
+    ellipse var(--vw) var(--vh) at var(--vcx) var(--vcy),
+    transparent var(--vstop),
+    black 100%
+  );
+  /* 14s loop — enough room for all 8 steps to feel like a
+     continuous wave (each segment lasts ~1.75s with ease-in-out
+     blending into the next). */
+  animation: vignetteShapeBreathe 14s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vignette-shape-breathe {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .outer-glow-swirl {
+    animation: none;
+  }
+}
+
+/* Respect reduced-motion globally for the shimmer keyframe. */
+@media (prefers-reduced-motion: reduce) {
+  .fire-shimmer {
+    animation: none;
+    color: #fbfbfb;
+    -webkit-text-fill-color: #fbfbfb;
+  }
+}
+
+/* Entry-count badge pop — squash & stretch as it appears (Navbar). Grows
+   from nothing, overshoots wide-then-tall, then settles. */
+@keyframes badgePop {
+  0% { transform: scale(0); }
+  45% { transform: scale(1.3, 0.8); }
+  70% { transform: scale(0.9, 1.12); }
+  86% { transform: scale(1.04, 0.97); }
+  100% { transform: scale(1); }
+}
+
+/* "¿Reusar o compartir?" prompt entrance (post-entry-created). */
+@keyframes promptIn {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Green "Entrada creada" card appearing (slip → green) — a circle expanding
+   outward from the card's center until it covers the whole card. 75% of the
+   clip reference box comfortably covers the card's corners. */
+@keyframes greenCircleIn {
+  0% { clip-path: circle(12px at 50% 50%); }
+  100% { clip-path: circle(75% at 50% 50%); }
+}
+
+/* Check + text popping in with the circular reveal (same duration). */
+@keyframes greenContentIn {
+  0% { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Mis entradas icon "catch" bump when the genie ticket lands. */
+@keyframes iconBump {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+/* ---------------------------------------------------------------- */
+/*  QUICK BET — hold progress.                                        */
+/*                                                                      */
+/*  The inline background-fill + completion-accent stroke ring that       */
+/*  used to render on the pressed selection itself are RETIRED — hold       */
+/*  progress now renders ONLY in the floating pill (OneClickBetPill.tsx),    */
+/*  fed by `session.progress` from useOneClickBetSession                     */
+/*  (oneClickBetSession.ts). See CLAUDE.md's "floating pill" landmark.         */
+/*                                                                               */
+/*  --qb-progress / --qb-stroke-progress remain registered below because        */
+/*  the Quick Bet ONBOARDING demo loop (OnboardingSheet.tsx's                    */
+/*  QuickBetDemoLoop, `.qb-demo-*` classes further down this file) still          */
+/*  drives them via its own self-contained CSS keyframe timeline — that is        */
+/*  NOT a real press, so it isn't affected by this retirement.                     */
+/* ---------------------------------------------------------------- */
+@property --qb-progress {
+  syntax: '<number>';
+  initial-value: 0;
+  /* MUST inherit: the value is written onto the button itself, but the
+     fill lives on its ::before — which, for inheritance purposes, is its
+     child and only sees the value if it inherits. */
+  inherits: true;
+}
+
+@property --qb-stroke-progress {
+  syntax: '<number>';
+  initial-value: 0;
+  /* Same inheritance requirement as --qb-progress above, for ::after. */
+  inherits: true;
+}
+
+/* ---------------------------------------------------------------- */
+/*  QUICK BET — suppress native text selection / callout / drag       */
+/*  across the ENTIRE pressable subtree, not just the fill pill.       */
+/*                                                                      */
+/*  `.qb-hold` marks only the small odds pill that renders the actual    */
+/*  fill/stroke — in MarketAccordion that pill is a small child at the    */
+/*  BOTTOM of the card, while the real long-press TARGET (bindPick spread) */
+/*  is the whole outer card button. Player name / team / position / date/  */
+/*  time text sit as SIBLINGS of the pill, not descendants, so scoping       */
+/*  selection-prevention to `.qb-hold` alone left most of the card's text     */
+/*  — exactly where a thumb rests during a hold — natively selectable.        */
+/*                                                                               */
+/*  `.qb-press` is applied directly to the actual interactive root in both       */
+/*  PromoCarousel and MarketAccordion (see HomeScreen.tsx) and recurses via        */
+/*  the universal child selector so every current and future descendant            */
+/*  (text, icons, images) is covered regardless of DOM depth — no reliance           */
+/*  on inheritance quirks or exact nesting.                                            */
+/* ---------------------------------------------------------------- */
+.qb-press,
+.qb-press * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.qb-hold {
+  position: relative;
+  /* Suppress unwanted default long-press behavior while preserving pan/
+     scroll gestures. Selection/callout prevention lives on `.qb-press`
+     above (applied to the actual press-target root, not this pill). No
+     progress visual lives here anymore — see the retirement note above. */
+  touch-action: manipulation;
+}
+
+/* ---------------------------------------------------------------- */
+/*  ONBOARDING SHEET — Quick Bet instructional animation (Task 7)    */
+/*  Educational, fully self-contained loop of the complete hold →    */
+/*  progressive fill → completion → selected state → ticket            */
+/*  confirmation sequence (OnboardingSheet.tsx's QuickBetDemoLoop).      */
+/*  Reuses the REAL .qb-hold fill/stroke mechanics (--qb-progress /       */
+/*  --qb-stroke-progress, both @property'd above), the real selected-      */
+/*  state tokens (border #d2ff72, lime→cyan gradient), and the real          */
+/*  ticket shape/checkmark/colors (`TicketFace`, exported from                */
+/*  EntryCreatedOverlay.tsx) — driven end-to-end by ONE CSS keyframe            */
+/*  timeline instead of useLongPress's per-frame writes or                       */
+/*  EntryCreatedOverlay's mount-triggered Framer sequence, since nothing          */
+/*  here is a real press: no event handlers, no entry, no shared state             */
+/*  with the actual Quick Bet feature, and it must loop forever rather              */
+/*  than fire once.                                                                   */
+/*                                                                                      */
+/*  The ticket's reveal/pop/glow below MIRROR (not literally reuse)                     */
+/*  EntryCreatedOverlay's `greenCircleIn`/pop/glow-flash — same clip-path                */
+/*  radii, easing, and durations, just re-expressed as absolute %                         */
+/*  offsets into this loop's single timeline instead of that component's                   */
+/*  own mount-triggered one-shot animations (which can't be re-triggered                    */
+/*  every cycle without JS). The celebration spark burst + genie flight                      */
+/*  into the "Mis entradas" tab are deliberately NOT reproduced — there is                    */
+/*  no tab to fly to in this isolated preview, and the task calls for a                        */
+/*  self-contained loop, not a trip through the rest of the app.                                */
+/*                                                                                                 */
+/*  Segment timing — one 5720ms cycle, every keyframe below shares it                             */
+/*  so all layers land on the same beat:                                                           */
+/*     0.00%  –  8.74%  idle selection, no pointer (500ms)                                          */
+/*     8.74%  – 13.99%  pointer fades/settles in above the selection (300ms)                         */
+/*    13.99%  – 16.61%  pointer presses down — scales in, opacity climbs (150ms)                      */
+/*    16.61%  – 42.83%  HOLD: --qb-progress ramps 0→1 over a DEMO-ONLY 1500ms —                        */
+/*                       intentionally SHORTER than the real hold                                       */
+/*                       (buttonProgressionConfig.longPress.durationMs, 3000ms):                         */
+/*                       watching the full-width pill fill for a real 3s on                               */
+/*                       every loop read as sluggish, so this halves it purely                             */
+/*                       for legibility in a repeating preview — re-derive                                  */
+/*                       these % if this constant changes, it does NOT need to                               */
+/*                       track the real one. Pointer stays pressed with a                                     */
+/*                       subtle opacity pulse throughout.                                                      */
+/*    42.83%  – 46.68%  completion: stroke-progress sweeps 0→1 (220ms,                                          */
+/*                       strokeCompleteMs), fill clears, selected face snaps in                                  */
+/*    46.68%  – 51.05%  pointer releases — fades out, only once loading is done (250ms)                          */
+/*    51.05%  – 54.55%  pill fades out / ticket circular-reveal (200ms, mirrors                                   */
+/*                       greenCircleIn's real 0.2s)                                                                */
+/*    54.55%  – 66.08%  ticket pop (squash/stretch + overshoot) + glow flash                                       */
+/*    66.08%  – 86.01%  ticket confirmation holds, readable (~1500ms, close to                                      */
+/*                       EntryCreatedOverlay's cfg.confirmedHoldMs of 1700ms)                                        */
+/*    86.01%  – 93.01%  ticket fades back toward idle (400ms)                                                        */
+/*    93.01%  – 100%    brief pause before the next loop (400ms) — avoids an                                          */
+/*                       abrupt cut on restart                                                                         */
+/* ---------------------------------------------------------------- */
+@keyframes qbDemoProgress {
+  0%, 16.61% { --qb-progress: 0; }
+  42.83% { --qb-progress: 1; }
+  45.45%, 100% { --qb-progress: 0; }
+}
+
+@keyframes qbDemoStroke {
+  0%, 42.83% { --qb-stroke-progress: 0; }
+  46.68% { --qb-stroke-progress: 1; }
+  47.73%, 100% { --qb-stroke-progress: 0; }
+}
+
+@keyframes qbDemoSelectedFace {
+  0%, 42.83% { opacity: 0; }
+  43.1%, 51.05% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Pointer — a circular touch indicator (Chrome-devtools-style mobile
+   touch-emulation dot, NOT a mouse cursor), always centered over the
+   pill via absolute positioning in the markup. Opacity/scale only, so it
+   never shifts position: appears loose, tightens on "contact", holds
+   with a soft pulse for the full hold, then lifts off once loading (fill
+   AND the completion stroke) has fully finished. */
+@keyframes qbDemoPointer {
+  0%, 8.74% { opacity: 0; transform: scale(1.3); }
+  13.99% { opacity: 0.55; transform: scale(1.05); }
+  16.61% { opacity: 0.85; transform: scale(0.88); }
+  25.35% { opacity: 0.78; transform: scale(0.88); }
+  34.09% { opacity: 0.85; transform: scale(0.88); }
+  46.68% { opacity: 0.85; transform: scale(0.88); }
+  51.05%, 100% { opacity: 0; transform: scale(1.3); }
+}
+
+/* Pill + pointer group — fades out together as the handoff to the ticket
+   begins (short overlap with the ticket's own reveal below, so the two
+   events read as connected rather than a hard cut). */
+@keyframes qbDemoPillGroupOut {
+  0%, 51.05% { opacity: 1; }
+  54.55%, 100% { opacity: 0; }
+}
+
+/* Ticket group visibility — off for the whole pill/hold sequence, on for
+   the reveal → hold → fade-out window. */
+@keyframes qbDemoTicketWrap {
+  0%, 51.05% { opacity: 0; }
+  51.4%, 86.01% { opacity: 1; }
+  93.01%, 100% { opacity: 0; }
+}
+
+/* Circular reveal — same technique/radii as EntryCreatedOverlay's
+   `greenCircleIn` (12px seed → 75% of the box), timed into this loop's
+   51.05%–54.55% window (200ms, matching the real 0.2s). */
+@keyframes qbDemoTicketReveal {
+  0%, 51.05% { clip-path: circle(12px at 50% 50%); }
+  54.55%, 100% { clip-path: circle(75% at 50% 50%); }
+}
+
+/* Squash/stretch pop + spring-like overshoot on reveal-complete — mirrors
+   EntryCreatedOverlay's `cfg.pop` (scaleX 1.035 / scaleY 0.965, springing
+   back with a slight overshoot the other way before settling). */
+@keyframes qbDemoTicketPop {
+  0%, 54.55% { transform: scale(1, 1); }
+  55.24% { transform: scale(1.035, 0.965); }
+  58.39% { transform: scale(0.99, 1.01); }
+  59.79%, 100% { transform: scale(1, 1); }
+}
+
+/* Green glow flash on reveal-complete — mirrors EntryCreatedOverlay's
+   `ticketGlow`/`cfg.pop.glowDecayMs` (flashes to peak, eases back to the
+   ticket's resting drop-shadow over ~620ms). Drives a registered custom
+   property so the drop-shadow's blur/alpha can both scale off one value. */
+@keyframes qbDemoTicketGlow {
+  0%, 54.55% { --qb-ticket-glow: 0; }
+  55.24% { --qb-ticket-glow: 1; }
+  66.08%, 100% { --qb-ticket-glow: 0; }
+}
+
+@property --qb-ticket-glow {
+  syntax: '<number>';
+  initial-value: 0;
+  inherits: true;
+}
+
+.qb-demo-pill {
+  animation:
+    qbDemoProgress 5720ms linear infinite,
+    qbDemoStroke 5720ms linear infinite;
+}
+
+.qb-demo-selected {
+  animation: qbDemoSelectedFace 5720ms linear infinite;
+}
+
+.qb-demo-pointer {
+  animation: qbDemoPointer 5720ms linear infinite;
+}
+
+.qb-demo-pillgroup {
+  animation: qbDemoPillGroupOut 5720ms linear infinite;
+}
+
+.qb-demo-ticket-wrap {
+  animation: qbDemoTicketWrap 5720ms linear infinite;
+}
+
+.qb-demo-ticket-reveal {
+  animation: qbDemoTicketReveal 5720ms linear infinite;
+}
+
+.qb-demo-ticket-pop {
+  animation:
+    qbDemoTicketPop 5720ms linear infinite,
+    qbDemoTicketGlow 5720ms linear infinite;
+  filter: drop-shadow(
+    0 0 calc(16px + var(--qb-ticket-glow, 0) * 30px)
+      rgba(54, 229, 169, calc(0.36 + var(--qb-ticket-glow, 0) * 0.5))
+  );
+}
+
+/* Reduced motion: freeze on the single most informative frame — the
+   completed ticket confirmation, on its own (pill + pointer hidden) —
+   instead of looping, same "static representative frame" treatment this
+   file already gives the fire-shimmer/glow-swirl ambient effects above. */
+@media (prefers-reduced-motion: reduce) {
+  .qb-demo-pill,
+  .qb-demo-selected,
+  .qb-demo-pointer,
+  .qb-demo-ticket-reveal,
+  .qb-demo-ticket-pop {
+    animation: none;
+  }
+  .qb-demo-pillgroup {
+    animation: none;
+    opacity: 0;
+  }
+  .qb-demo-ticket-wrap {
+    animation: none;
+    opacity: 1;
+  }
+  .qb-demo-ticket-reveal {
+    clip-path: circle(75% at 50% 50%);
+  }
+  .qb-demo-ticket-pop {
+    transform: scale(1, 1);
+    filter: drop-shadow(0 0 16px rgba(54, 229, 169, 0.36));
+  }
+}
+
+/* The inline fill (::before) + completion-accent stroke ring (::after) that
+   used to render on `.qb-hold` here are retired — see the retirement note
+   near `@property --qb-progress` above. Hold progress now renders only in
+   the floating pill (OneClickBetPill.tsx). */
+
+/* ---------------------------------------------------------------- */
+/*  ONE CLICK BET FLOATING PILL — internal energy particles.         */
+/*  Each `.ocb-pill-particle` spans the pill's FULL width (so its own  */
+/*  transform:translateX(%) travels a full container-width, not just    */
+/*  its own tiny size) and paints a small radial-gradient dot via         */
+/*  `background-position`/`background-size` — the dot's on-screen          */
+/*  position comes entirely from the parent's translateX, so the whole      */
+/*  element only ever animates `transform` (GPU-compositable, no layout      */
+/*  or paint cost from the travel itself). Left→right, looped, staggered      */
+/*  per-particle via `animation-delay` (see buttonProgressionConfig.ts's       */
+/*  ocbVfx.particles). Visibility/density is controlled entirely by the        */
+/*  wrapping div's `opacity` style (set from the live progress value in         */
+/*  OneClickBetPill.tsx) — this animation itself never reads progress,           */
+/*  so nothing here needs a per-frame JS write.                                   */
+/* ---------------------------------------------------------------- */
+.ocb-pill-particle {
+  width: 100%;
+  /* White-hot core fading through the purple accent into transparent — a
+     subtle glow rather than a flat purple dot. `background-size` is wider
+     than `--ocb-particle-size` itself so the outer glow ring has room to
+     fall off softly before hitting transparent. */
+  background-image: radial-gradient(
+    circle,
+    #ffffff 0%,
+    rgba(255, 255, 255, 0.85) 18%,
+    rgba(143, 46, 255, 0.9) 45%,
+    rgba(143, 46, 255, 0) 78%
+  );
+  background-repeat: no-repeat;
+  background-size: calc(var(--ocb-particle-size) * 2.4)
+    calc(var(--ocb-particle-size) * 2.4);
+  background-position: 10% center;
+  animation-name: ocbParticleTravel;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  /* Belt-and-suspenders alongside the negative `animation-delay`s in
+     buttonProgressionConfig.ts: guarantees the element always renders at a
+     keyframe position, never its un-animated resting spot. */
+  animation-fill-mode: both;
+  will-change: transform;
+}
+
+@keyframes ocbParticleTravel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocb-pill-particle {
+    animation: none;
+  }
+}
