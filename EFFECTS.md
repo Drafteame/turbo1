@@ -253,6 +253,11 @@ These are the "One Click Bet" exploration effects, distinct from the tier-progre
 - **Close squash-&-stretch.** A subtle pulse (`scaleX`/`scaleY` → `1.03`/`0.95`, `PULSE_SPRING`, anchored bottom-center) fires as the card shrinks in — the same collapse pulse the summarized slip uses — so the card visibly squashes into the pill. Applied on the same wrapper as `morphY`.
 - Selections list scrollbar hidden (`no-scrollbar`).
 
+**Fixed entry values — "next step" tooltip** (`ButtonPreviewMomios.tsx` collapsed pill + `BetSlipFullSheet.tsx` footer)
+- The Monto/Ganancia fields are relabeled **"Monto fijo" / "Ganancia fija"** (not just "Monto"/"Ganancia") to signal the value is read-only, always drawn from the fixed selection-count table (`buttonProgressionConfig.slipEntry`) rather than derived from odds.
+- **On every selection add**, while a next step exists (i.e. not already at `maxSelections`), a small dark pill-shaped tooltip appears above "Monto fijo" on the collapsed pill for `cfg.fixedEntryPeek.durationMs` (1800ms) reading `+1 sel. → $X · gana $Y` — the next count's fixed amount/winnings (`getNextSlipEntryValues`). Fades in/out (`opacity`+`y`, 180ms).
+- The **Resumen floating card** shows the same idea as a persistent caption under the Monto/Acierta/Ganancia stat bar (once 2+ selections and a next step exists): `🔒 Fijo para N selecciones — agrega 1 más → $X · gana $Y`.
+
 **Swipe-to-confirm** (`BetSlipSheet` + `BetSlipFullSheet`)
 - Confirms **only** when the thumb reaches the measured end of the track (not a fixed px). On completion the thumb pins and shows a spinner for `CONFIRM_LOADER_MS` (900ms, simulated ticket creation) before firing the success flow.
 

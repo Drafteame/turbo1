@@ -27,15 +27,6 @@ export type Selection = {
 
 export type Tier = 0 | 1 | 2 | 3 | 4;
 
-/**
- * EXPLORATION (`explore/fixed-entry-values-ui`) — dev-only switch between
- * three ways of communicating that each selection count has its own fixed
- * (non-editable) amount/winnings, and that adding a selection advances to
- * the next predefined step. See CLAUDE.md / the branch comparison for what
- * each one looks like.
- */
-export type FixedEntryVariant = 'peek' | 'ladder' | 'level';
-
 export type TierConfig = {
   id: Tier;
   name: string;

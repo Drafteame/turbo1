@@ -17,7 +17,7 @@ import {
 } from './buttonProgressionConfig';
 import { ButtonPreviewMomios } from './ButtonPreviewMomios';
 import { SwipeToConfirm } from './SwipeToConfirm';
-import type { FixedEntryVariant, Selection } from './types';
+import type { Selection } from './types';
 
 /**
  * BetSlipSheet — the one-click bet slip, as a single morphing container.
@@ -120,9 +120,6 @@ type Props = {
   onKeepAlive: () => void;
   /** Parlay "Lista" tab — opens the full-screen summary sheet. */
   onOpenList: () => void;
-  /** EXPLORATION (`explore/fixed-entry-values-ui`) — forwarded to the
-      collapsed pill (`ButtonPreviewMomios`). Default 'peek'. */
-  fixedEntryVariant?: FixedEntryVariant;
 };
 
 export function BetSlipSheet({
@@ -135,7 +132,6 @@ export function BetSlipSheet({
   onConfirm,
   onKeepAlive,
   onOpenList,
-  fixedEntryVariant = 'peek',
 }: Props) {
   // Entry amount + potential winnings come from the centralized
   // selection-count config, not from odds (see buttonProgressionConfig's
@@ -424,7 +420,6 @@ export function BetSlipSheet({
             cumulativeOdds={cumulativeOdds}
             speedScale={1}
             tier3OddsEffect={buttonProgressionConfig.tier3OddsEffect}
-            fixedEntryVariant={fixedEntryVariant}
           />
         </motion.div>
 

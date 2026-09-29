@@ -29,7 +29,7 @@ import {
 import { OutlineRipple } from './OutlineRipple';
 import { playSound } from './playSound';
 import { SlotNumber } from './SlotNumber';
-import type { FixedEntryVariant, Tier } from './types';
+import type { Tier } from './types';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 /* =================================================================== */
@@ -64,9 +64,6 @@ type Props = {
   onLiveState?: (s: ButtonLiveState) => void;
   /** PASS 3 — Tier 3 odds effect variant. Default 'flames'. */
   tier3OddsEffect?: 'flames' | 'smoke';
-  /** EXPLORATION (`explore/fixed-entry-values-ui`) — which fixed-entry-values
-      treatment the collapsed pill shows. Default 'peek'. */
-  fixedEntryVariant?: FixedEntryVariant;
 };
 
 export function ButtonPreviewMomios({
@@ -75,7 +72,6 @@ export function ButtonPreviewMomios({
   speedScale = 1,
   onLiveState,
   tier3OddsEffect = cfg.tier3OddsEffect,
-  fixedEntryVariant = 'peek',
 }: Props) {
   // MASTER SWITCH — when `cfg.animationsEnabled` is false, treat the button
   // as reduced-motion. This reuses every existing `!reduced` gate to suppress
@@ -560,10 +556,8 @@ export function ButtonPreviewMomios({
   const [outlineRipples, setOutlineRipples] = useState<
     Array<{ id: number; prominent: boolean }>
   >([]);
-  // EXPLORATION (`explore/fixed-entry-values-ui`) — the 'peek' variant's
-  // transient "next step" tooltip, shown briefly above the pill whenever a
-  // selection is added. The 'level' variant reuses `selectionCount` itself
-  // as the animate-key for its "+1 nivel" pop, so it needs no extra state.
+  // Transient "next step" tooltip, shown briefly above the pill whenever a
+  // selection is added (see `getNextSlipEntryValues`).
   const [showNextPeek, setShowNextPeek] = useState(false);
   /* =============================================================== */
   /*  REGRESSION FIX — Odds glow as a TEXT-SHADOW STACK on the real  */
@@ -800,14 +794,9 @@ export function ButtonPreviewMomios({
       playSound('slot-end');
     }, effectiveSlotMs);
 
-    // EXPLORATION (`explore/fixed-entry-values-ui`) — 'peek' variant's
-    // transient "next step" tooltip. Only on adds, only while there's a
+    // Transient "next step" tooltip. Only on adds, only while there's a
     // next step to preview (i.e. not already at `maxSelections`).
-    if (
-      fixedEntryVariant === 'peek' &&
-      selectionCount > prev &&
-      getNextSlipEntryValues(selectionCount)
-    ) {
+    if (selectionCount > prev && getNextSlipEntryValues(selectionCount)) {
       setShowNextPeek(true);
       setTimeout(() => setShowNextPeek(false), cfg.fixedEntryPeek.durationMs);
     }
@@ -879,7 +868,6 @@ export function ButtonPreviewMomios({
     countControls,
     oddsSettleControls,
     oddsBurstControls,
-    fixedEntryVariant,
   ]);
 
   /* =============================================================== */
@@ -1041,7 +1029,7 @@ export function ButtonPreviewMomios({
     () => getSlipEntryValues(selectionCount),
     [selectionCount],
   );
-  // EXPLORATION — next step's fixed values, for the 'peek'/'ladder' variants.
+  // Next step's fixed values, for the "next step" tooltip.
   const nextEntry = useMemo(
     () => getNextSlipEntryValues(selectionCount),
     [selectionCount],
@@ -1397,29 +1385,27 @@ export function ButtonPreviewMomios({
               {/* MONTO — entry amount, read from the centralized
                   selection-count config (see getSlipEntryValues). Dims to
                   the Figma empty-state 24% opacity below `minSelections`.
-                  EXPLORATION (`explore/fixed-entry-values-ui`): the label
-                  and a lock glyph vary by `fixedEntryVariant` to signal the
-                  value is fixed/non-editable; 'peek' also anchors the
-                  transient "next step" tooltip here. */}
+                  "Monto fijo" (not just "Monto") + the transient "next
+                  step" tooltip both signal the value is fixed/non-editable
+                  and that adding a selection moves to the next predefined
+                  step. */}
               <div
                 className="relative flex flex-col items-start justify-center"
                 style={{ opacity: ctaDisabled ? 0.24 : 1 }}
               >
-                {fixedEntryVariant === 'peek' && (
-                  <AnimatePresence>
-                    {showNextPeek && nextEntry && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 4 }}
-                        transition={{ duration: 0.18 }}
-                        className="absolute -top-[30px] left-0 z-10 whitespace-nowrap rounded-full bg-[#161616] px-2 py-1 text-[10px] font-bold text-[#fbfbfb] shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
-                      >
-                        +1 sel. → ${nextEntry.amount} · gana ${nextEntry.potentialWin}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                )}
+                <AnimatePresence>
+                  {showNextPeek && nextEntry && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.18 }}
+                      className="absolute -top-[30px] left-0 z-10 whitespace-nowrap rounded-full bg-[#161616] px-2 py-1 text-[10px] font-bold text-[#fbfbfb] shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                    >
+                      +1 sel. → ${nextEntry.amount} · gana ${nextEntry.potentialWin}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 <p
                   style={{
                     fontFamily: 'Red Hat Display, sans-serif',
@@ -1433,9 +1419,6 @@ export function ButtonPreviewMomios({
                     filter: tier === 4 ? cfg.tier4.numberGlow : 'none',
                   }}
                 >
-                  {fixedEntryVariant === 'level' && (
-                    <span className="mr-0.5 text-[10px] opacity-60">🔒</span>
-                  )}
                   ${entryAmount}
                 </p>
                 <p
@@ -1447,73 +1430,32 @@ export function ButtonPreviewMomios({
                     color: 'rgba(251,251,251,0.5)',
                   }}
                 >
-                  {fixedEntryVariant === 'peek' ? 'Monto fijo' : 'Monto'}
+                  Monto fijo
                 </p>
               </div>
 
-              {/* MIDDLE COLUMN — 'peek': unchanged "Acierta N/N". 'ladder':
-                  the numeric text is replaced by a mini step ladder (dots
-                  for each configured selection count, current one
-                  highlighted) so the "you're on a fixed step, adding one
-                  more moves you to the next" idea reads visually. 'level':
-                  reframed as "Nivel N" (N = step index from
-                  `minSelections`), with a badge-pop replay on every
-                  increase. Only shown once the entry is active (2+) — the
-                  Figma empty-state pill (below `minSelections`) has no
+              {/* ACIERTA N/N — replaces the old odds ("Momio") field.
+                  A parlay needs every selection to hit, so N/N is always
+                  selectionCount/selectionCount (e.g. "Acierta 3/3"). Only
+                  shown once the entry is active (2+) — the Figma
+                  empty-state pill (below `minSelections`) has no
                   equivalent third field at all, see the disabled CTA
                   above. */}
               {!ctaDisabled && (
                 <div className="flex flex-col items-start justify-center">
-                  {fixedEntryVariant === 'ladder' ? (
-                    <div className="flex h-[21px] items-center gap-[3px]">
-                      {Array.from(
-                        {
-                          length:
-                            cfg.maxSelections -
-                            cfg.slipEntry.minSelections +
-                            1,
-                        },
-                        (_, i) => i + cfg.slipEntry.minSelections,
-                      ).map((step) => (
-                        <div
-                          key={step}
-                          className="rounded-full transition-all duration-150"
-                          style={{
-                            width: step === selectionCount ? 6 : 4,
-                            height: step === selectionCount ? 6 : 4,
-                            background:
-                              step === selectionCount
-                                ? '#fbfbfb'
-                                : step < selectionCount
-                                  ? 'rgba(251,251,251,0.6)'
-                                  : 'rgba(251,251,251,0.24)',
-                          }}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p
-                      key={fixedEntryVariant === 'level' ? `level-${selectionCount}` : undefined}
-                      className={
-                        fixedEntryVariant === 'level'
-                          ? 'animate-[badgePop_0.4s_ease-out]'
-                          : undefined
-                      }
-                      style={{
-                        fontFamily: 'Red Hat Display, sans-serif',
-                        fontWeight: 900,
-                        fontStyle: tier >= 3 ? 'italic' : 'normal',
-                        fontSize: 14,
-                        lineHeight: '21px',
-                        color: '#fbfbfb',
-                        filter: tier === 4 ? cfg.tier4.numberGlow : 'none',
-                      }}
-                    >
-                      {fixedEntryVariant === 'level'
-                        ? `Nivel ${selectionCount - cfg.slipEntry.minSelections + 1}`
-                        : `${selectionCount}/${selectionCount}`}
-                    </p>
-                  )}
+                  <p
+                    style={{
+                      fontFamily: 'Red Hat Display, sans-serif',
+                      fontWeight: 900,
+                      fontStyle: tier >= 3 ? 'italic' : 'normal',
+                      fontSize: 14,
+                      lineHeight: '21px',
+                      color: '#fbfbfb',
+                      filter: tier === 4 ? cfg.tier4.numberGlow : 'none',
+                    }}
+                  >
+                    {selectionCount}/{selectionCount}
+                  </p>
                   <p
                     style={{
                       fontFamily: 'Red Hat Display, sans-serif',
@@ -1523,7 +1465,7 @@ export function ButtonPreviewMomios({
                       color: 'rgba(251,251,251,0.5)',
                     }}
                   >
-                    {fixedEntryVariant === 'level' ? 'Nivel' : 'Acierta'}
+                    Acierta
                   </p>
                 </div>
               )}
@@ -1597,9 +1539,6 @@ export function ButtonPreviewMomios({
                             : 'none',
                     }}
                   >
-                    {fixedEntryVariant === 'level' && (
-                      <span className="mr-0.5 text-[10px] opacity-70">🔒</span>
-                    )}
                     <SlotNumber
                       value={`$${entryPotentialWin}`}
                       reducedMotion={reduced}

@@ -60,8 +60,8 @@ export const buttonProgressionConfig = {
       8: { amount: 80, potentialWin: 400 },
     } as Record<number, { amount: number; potentialWin: number }>,
   },
-  // EXPLORATION (`explore/fixed-entry-values-ui`) — 'peek' variant's
-  // transient "next step" tooltip lifetime, shown on the collapsed pill.
+  // "Next step" tooltip lifetime, shown on the collapsed pill on every
+  // selection add (see `getNextSlipEntryValues`).
   fixedEntryPeek: {
     durationMs: 1800,
   },
@@ -774,11 +774,11 @@ export function canConfirmEntry(selectionCount: number): boolean {
 }
 
 /**
- * EXPLORATION (`explore/fixed-entry-values-ui`) — the fixed amount/winnings
- * for the NEXT selection count, or `null` once already at the configured max
- * (nothing to advance to). Used only by the fixed-entry-values UI variants
- * to preview "add one more selection → these are the next numbers" — never
- * a real, addable value (adding is still driven by `Selection` picks).
+ * The fixed amount/winnings for the NEXT selection count, or `null` once
+ * already at the configured max (nothing to advance to). Used by the
+ * collapsed pill's "next step" tooltip and the Resumen card's caption to
+ * preview "add one more selection → these are the next numbers" — never a
+ * real, addable value (adding is still driven by `Selection` picks).
  */
 export function getNextSlipEntryValues(
   selectionCount: number,

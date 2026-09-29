@@ -16,13 +16,12 @@ import freebetIllus from './assets/freebet.png';
 import playerIcon from './assets/player.svg';
 import trashIcon from './assets/trash.svg';
 import {
-  buttonProgressionConfig as cfg,
   canConfirmEntry,
   getNextSlipEntryValues,
   getSlipEntryValues,
 } from './buttonProgressionConfig';
 import { SwipeToConfirm } from './SwipeToConfirm';
-import type { FixedEntryVariant, Selection } from './types';
+import type { Selection } from './types';
 
 /**
  * BetSlipFullSheet — the "Resumen de tu entrada" floating card.
@@ -98,9 +97,6 @@ type Props = {
   onClose: () => void;
   /** Swipe-to-play — places the bet. */
   onConfirm: () => void;
-  /** EXPLORATION (`explore/fixed-entry-values-ui`) — which fixed-entry-values
-      treatment the footer shows. Default 'peek'. */
-  fixedEntryVariant?: FixedEntryVariant;
 };
 
 export function BetSlipFullSheet({
@@ -109,15 +105,13 @@ export function BetSlipFullSheet({
   onClearAll,
   onClose,
   onConfirm,
-  fixedEntryVariant = 'peek',
 }: Props) {
   // Entry amount + potential winnings — centralized selection-count config,
   // not derived from odds (see buttonProgressionConfig's `slipEntry`).
   const { amount, potentialWin } = getSlipEntryValues(selections.length);
   const canConfirm = canConfirmEntry(selections.length);
-  // EXPLORATION — next step's fixed values, for the 'peek'/'ladder' variants.
+  // Next step's fixed values, for the next-step caption below the stat bar.
   const nextEntry = getNextSlipEntryValues(selections.length);
-  const levelIndex = selections.length - cfg.slipEntry.minSelections + 1;
   const orderedSelections = [...selections].reverse(); // latest first
 
   // SHAPE MORPH — the card grows out of the slip footprint on open and shrinks
@@ -404,157 +398,63 @@ export function BetSlipFullSheet({
           ))}
         </div>
 
-        {/* FOOTER — Monto / Acierta N/N (or "Nivel N") / Ganancia: a plain
-            stat bar (one shared surface + thin vertical dividers, no
-            per-field borders or floating-label chips), so it reads as a
-            read-only summary rather than a row of editable text inputs.
-            Values come from the centralized selection-count config; not
-            editable, not derived from odds. "Acierta N/N" — a parlay needs
-            every selection to hit, so it's always
+        {/* FOOTER — Monto fijo / Acierta N/N / Ganancia fija: a plain stat
+            bar (one shared surface + thin vertical dividers, no per-field
+            borders or floating-label chips), so it reads as a read-only
+            summary rather than a row of editable text inputs. Values come
+            from the centralized selection-count config; not editable, not
+            derived from odds. "Acierta N/N" — a parlay needs every
+            selection to hit, so it's always
             selections.length/selections.length; below the 2-selection
             minimum it shows an inactive "—/—" instead of implying a valid
-            entry could already be placed.
-            EXPLORATION (`explore/fixed-entry-values-ui`): `fixedEntryVariant`
-            adds a below-the-bar row making the "fixed step, next step"
-            idea explicit — a next-step caption ('peek'), a labeled step
-            ladder ('ladder'), or a level progress bar ('level'). */}
+            entry could already be placed. The caption below the bar makes
+            the "fixed step, next step" idea explicit — adding a selection
+            moves you to the next predefined amount/winnings. */}
         <div className="flex shrink-0 flex-col gap-3 border-t border-[rgba(251,251,251,0.16)] px-[10px] pb-2 pt-[10px]">
           <div className="flex h-[64px] items-stretch overflow-hidden rounded-[12px] bg-[rgba(251,251,251,0.04)]">
             {/* Monto */}
             <div className="flex min-w-px flex-1 flex-col items-center justify-center gap-0.5">
               <span className="text-[11px] font-medium uppercase tracking-wide text-[rgba(251,251,251,0.5)]">
-                {fixedEntryVariant === 'peek' ? 'Monto fijo' : 'Monto'}
+                Monto fijo
               </span>
               <span className="text-[16px] font-bold leading-6 text-[#fbfbfb]">
-                {fixedEntryVariant === 'level' && (
-                  <span className="mr-0.5 text-[11px] opacity-60">🔒</span>
-                )}
                 ${amount}
               </span>
             </div>
             <div className="my-3 w-px shrink-0 bg-[rgba(251,251,251,0.12)]" />
-            {/* Acierta N/N / Nivel N */}
+            {/* Acierta N/N */}
             <div
               className="flex min-w-px flex-1 flex-col items-center justify-center gap-0.5"
               style={{ opacity: canConfirm ? 1 : 0.4 }}
             >
               <span className="text-[11px] font-medium uppercase tracking-wide text-[rgba(251,251,251,0.5)]">
-                {fixedEntryVariant === 'level' ? 'Nivel' : 'Acierta'}
+                Acierta
               </span>
-              <span
-                key={
-                  fixedEntryVariant === 'level'
-                    ? `level-${selections.length}`
-                    : undefined
-                }
-                className={
-                  'text-[16px] font-bold leading-6 text-[#fbfbfb]' +
-                  (fixedEntryVariant === 'level'
-                    ? ' inline-block animate-[badgePop_0.4s_ease-out]'
-                    : '')
-                }
-              >
-                {!canConfirm
-                  ? '—/—'
-                  : fixedEntryVariant === 'level'
-                    ? `${levelIndex}`
-                    : `${selections.length}/${selections.length}`}
+              <span className="text-[16px] font-bold leading-6 text-[#fbfbfb]">
+                {canConfirm ? `${selections.length}/${selections.length}` : '—/—'}
               </span>
             </div>
             <div className="my-3 w-px shrink-0 bg-[rgba(251,251,251,0.12)]" />
             {/* Ganancia */}
             <div className="flex min-w-px flex-1 flex-col items-center justify-center gap-0.5">
               <span className="text-[11px] font-medium uppercase tracking-wide text-[rgba(251,251,251,0.5)]">
-                {fixedEntryVariant === 'peek' ? 'Ganancia fija' : 'Ganancia'}
+                Ganancia fija
               </span>
               <span className="text-[16px] font-bold leading-6 text-[#fbbf24]">
-                {fixedEntryVariant === 'level' && (
-                  <span className="mr-0.5 text-[11px] opacity-70">🔒</span>
-                )}
                 ${potentialWin}
               </span>
             </div>
           </div>
 
-          {/* EXPLORATION — 'peek': next-step caption. Hidden once there's no
-              next step (already at `maxSelections`) or below the minimum
-              (nothing to "add one more" from yet, that's what the empty/1
-              state copy below already covers). */}
-          {fixedEntryVariant === 'peek' && canConfirm && nextEntry && (
+          {/* Next-step caption. Hidden once there's no next step (already at
+              `maxSelections`) or below the minimum (nothing to "add one
+              more" from yet — that's what the empty/1 state copy already
+              covers). */}
+          {canConfirm && nextEntry && (
             <p className="-mt-1 text-center text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.6)]">
               🔒 Fijo para {selections.length} selecciones — agrega 1 más → $
               {nextEntry.amount} · gana ${nextEntry.potentialWin}
             </p>
-          )}
-
-          {/* EXPLORATION — 'ladder': the full step ladder (every configured
-              selection count from `minSelections` to `maxSelections`), each
-              step showing its own fixed $ amount. Makes "adding a selection
-              moves you to the next predefined amount" visible as a single
-              picture rather than two numbers you have to compare mentally. */}
-          {fixedEntryVariant === 'ladder' && (
-            <div className="-mt-1 flex items-start justify-between gap-0.5">
-              {Array.from(
-                {
-                  length: cfg.maxSelections - cfg.slipEntry.minSelections + 1,
-                },
-                (_, i) => i + cfg.slipEntry.minSelections,
-              ).map((step) => {
-                const stepValues = getSlipEntryValues(step);
-                const isCurrent = step === selections.length;
-                const isPast = step < selections.length;
-                return (
-                  <div
-                    key={step}
-                    className="flex flex-1 flex-col items-center gap-1"
-                  >
-                    <div
-                      className="rounded-full transition-all duration-150"
-                      style={{
-                        width: isCurrent ? 8 : 6,
-                        height: isCurrent ? 8 : 6,
-                        background: isCurrent
-                          ? '#a954ff'
-                          : isPast
-                            ? 'rgba(169,84,255,0.6)'
-                            : 'rgba(251,251,251,0.24)',
-                      }}
-                    />
-                    <span
-                      className="text-[10px] font-bold leading-3"
-                      style={{
-                        color: isCurrent ? '#fbfbfb' : 'rgba(251,251,251,0.4)',
-                      }}
-                    >
-                      ${stepValues.amount}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* EXPLORATION — 'level': a slim level-progress bar reinforcing
-              "Nivel N" above with "N de MAX" and a filled track. */}
-          {fixedEntryVariant === 'level' && canConfirm && (
-            <div className="-mt-1 flex items-center gap-2">
-              <div className="h-1 min-w-px flex-1 overflow-hidden rounded-full bg-[rgba(251,251,251,0.12)]">
-                <div
-                  className="h-full rounded-full bg-[#a954ff] transition-[width] duration-300 ease-out"
-                  style={{
-                    width: `${
-                      (levelIndex /
-                        (cfg.maxSelections - cfg.slipEntry.minSelections + 1)) *
-                      100
-                    }%`,
-                  }}
-                />
-              </div>
-              <span className="shrink-0 text-[11px] font-medium text-[rgba(251,251,251,0.5)]">
-                Nivel {levelIndex} de{' '}
-                {cfg.maxSelections - cfg.slipEntry.minSelections + 1}
-              </span>
-            </div>
           )}
 
           {/* Promos — free bet + Booster. Toggles are CSS controls; the

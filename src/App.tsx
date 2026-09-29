@@ -14,7 +14,7 @@ import {
 } from './OneClickBetPill';
 import { useOneClickBetSession } from './oneClickBetSession';
 import { useOneClickBetOnboarding } from './oneClickBetOnboarding';
-import type { FixedEntryVariant, Selection, Tier } from './types';
+import type { Selection, Tier } from './types';
 
 // One Click Bet: how long the pressed pick shows its selected/filled state
 // before the pill dismisses. Feeds the OneClickBetSession's acceptToSubmitMs
@@ -170,12 +170,6 @@ export function App() {
   // slip alongside the new pill without touching the real `expanded={false}`
   // wiring below.
   const [debugSlipExpanded, setDebugSlipExpanded] = useState(false);
-  // EXPLORATION (`explore/fixed-entry-values-ui`) — dev-only switch between
-  // the three fixed-entry-values UI treatments, applied to both the
-  // collapsed pill and the "Resumen" floating card. See CLAUDE.md / the
-  // branch comparison for what each one looks like.
-  const [fixedEntryVariant, setFixedEntryVariant] =
-    useState<FixedEntryVariant>('peek');
 
   // Dismissal (× button, backdrop tap, swipe-down, or the primary CTA) —
   // persists "seen" for the rest of this browser session so it doesn't
@@ -641,39 +635,6 @@ export function App() {
                 </div>
               )}
 
-              {/* EXPLORATION (`explore/fixed-entry-values-ui`) — variant
-                  switch. Applies to both the collapsed pill and the
-                  "Resumen" floating card; open the pill or tap it to open
-                  the floating card, at any selection count, to compare. */}
-              {debug && (
-                <div className="mx-3 mb-2 mt-3 rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-3">
-                  <div className="mb-2 text-[11px] font-bold text-emerald-300">
-                    DEBUG · fixed entry values variant
-                  </div>
-                  <div className="flex gap-1.5">
-                    {(
-                      [
-                        ['peek', 'Peek'],
-                        ['ladder', 'Ladder'],
-                        ['level', 'Level'],
-                      ] as [FixedEntryVariant, string][]
-                    ).map(([v, label]) => (
-                      <button
-                        key={v}
-                        onClick={() => setFixedEntryVariant(v)}
-                        className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-bold ${
-                          fixedEntryVariant === v
-                            ? 'bg-emerald-300 text-black'
-                            : 'bg-white/10 text-white'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* DEV CONTROLS — One Click Bet floating pill preview.
                   Real gesture state now (see ocbSession above); the debug
                   buttons below only drive the pill when no real hold is
@@ -919,7 +880,6 @@ export function App() {
                           onConfirm={confirmBet}
                           onKeepAlive={() => {}}
                           onOpenList={() => setListOpen(true)}
-                          fixedEntryVariant={fixedEntryVariant}
                         />
                       )}
                     </AnimatePresence>
@@ -971,7 +931,6 @@ export function App() {
                   }}
                   onClose={() => setListOpen(false)}
                   onConfirm={confirmBet}
-                  fixedEntryVariant={fixedEntryVariant}
                 />
               )}
             </AnimatePresence>
