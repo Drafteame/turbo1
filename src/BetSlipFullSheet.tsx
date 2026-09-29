@@ -216,7 +216,15 @@ export function BetSlipFullSheet({
 
   return (
     <div
-      className="absolute inset-0 z-50"
+      // Whole-screen wrapper — the card itself only occupies the bottom
+      // portion, but this root spans inset-0 for the backdrop. During exit
+      // (isPresent false) the closing card fades/shrinks toward the pill,
+      // but this div — and its full-size children below — would otherwise
+      // keep intercepting clicks across the ENTIRE screen at full size
+      // (opacity alone doesn't stop hit-testing), leaving the app
+      // unresponsive until the AnimatePresence unmount actually completes.
+      // pointer-events-none here is the single gate for the whole sheet.
+      className={`absolute inset-0 z-50 ${!isPresent ? 'pointer-events-none' : ''}`}
       style={{ fontFamily: "'Red Hat Display', sans-serif" }}
     >
       {/* Dim backdrop — covers the navbar + feed behind the floating card, but
