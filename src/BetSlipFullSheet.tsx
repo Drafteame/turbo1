@@ -8,14 +8,11 @@ import {
   type PanInfo,
 } from 'framer-motion';
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import boosterIllus from './assets/booster.png';
-import chevronRightIcon from './assets/chevron_right.svg';
-import clockIcon from './assets/clock.svg';
 import closeIcon from './assets/close.svg';
-import freebetIllus from './assets/freebet.png';
 import playerIcon from './assets/player.svg';
 import trashIcon from './assets/trash.svg';
 import {
+  buttonProgressionConfig,
   canConfirmEntry,
   getNextSlipEntryValues,
   getSlipEntryValues,
@@ -37,13 +34,10 @@ import type { Selection } from './types';
  * Includes: header (delete-all trash + × + count + balance), scrollable
  * selections list, Monto/Ganancia footer (entry amount + potential
  * winnings, from the centralized selection-count config — not odds, not
- * user-editable), the free-bet/Booster promos box, and swipe-to-play.
- * Toggle switches are CSS controls. STILL PENDING one asset: the countdown
- * clock icon — the countdown pills currently show the time text without it.
+ * user-editable), progression preview, and swipe-to-play.
  *
  * Assets: close.svg (× + per-row remove), shield.svg (team placeholder),
- * chevron_right.svg (swipe thumb + Booster caret), trash.svg (delete-all),
- * freebet.png / booster.png (promo illustrations).
+ * trash.svg (delete-all).
  */
 
 const CLOSE_OFFSET_PX = 120;
@@ -87,6 +81,14 @@ const CARD_BORDER = 'rgba(251,251,251,0.12)';
 // (the collapsed pill), so the fully-shrunk capsule is pixel-close to the pill.
 const PILL_BG = 'linear-gradient(64.6deg, #14083d 0%, #230c3e 100%)';
 const PILL_BORDER = '#4b20ff';
+
+const progressionRows = Object.entries(buttonProgressionConfig.slipEntry.byCount).map(
+  ([count, values]) => ({
+    count: Number(count),
+    amount: values.amount,
+    potentialWin: values.potentialWin,
+  }),
+);
 
 type Props = {
   selections: Selection[];
@@ -465,82 +467,95 @@ export function BetSlipFullSheet({
             </p>
           )}
 
-          {/* Promos — free bet + Booster. Toggles are CSS controls; the
-              countdown clock glyph is still pending its asset. */}
-          <div className="flex flex-col overflow-hidden rounded-[16px] border border-[rgba(251,251,251,0.16)]">
-            {/* Free bet (disabled toggle) */}
-            <div className="flex items-center gap-2 px-3 py-2">
-              <div
-                className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[12px] p-1"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(140.5deg, #f0abfc 0%, #6b47ff 100%)',
-                }}
-              >
-                <img src={freebetIllus} alt="" className="size-7 object-contain" />
-              </div>
-              <div className="flex min-w-px flex-1 flex-col">
-                <span className="text-[14px] font-bold leading-[21px] text-[#fbfbfb]">
-                  Apuesta gratis
+          <div className="overflow-hidden rounded-[12px] border border-[rgba(251,251,251,0.12)] bg-[rgba(251,251,251,0.04)]">
+            <div className="flex items-center justify-between px-3 pb-2 pt-2.5">
+              <div className="flex min-w-px flex-col">
+                <span className="text-[12px] font-bold leading-4 text-[#fbfbfb]">
+                  Progresión
                 </span>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-5 items-center gap-1 rounded-[12px] bg-[rgba(251,251,251,0.12)] px-1">
-                    <img src={clockIcon} alt="" className="size-3" />
-                    <span className="text-[12px] font-medium leading-4 text-[#fbfbfb]">
-                      29d<span className="text-[rgba(251,251,251,0.7)]">:</span>23h
-                    </span>
-                  </div>
-                  <div className="h-4 w-px bg-[rgba(251,251,251,0.16)]" />
-                  <div className="flex items-center gap-1 text-[14px]">
-                    <span className="font-medium text-[rgba(251,251,251,0.5)]">
-                      Monto:
-                    </span>
-                    <span className="font-bold text-[rgba(251,251,251,0.7)]">$25</span>
-                  </div>
-                </div>
+                <span className="truncate text-[11px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
+                  Más selecciones, mayor ganancia fija
+                </span>
               </div>
-              {/* toggle — off + disabled */}
-              <div className="flex h-8 w-[52px] shrink-0 items-center rounded-full bg-[rgba(251,251,251,0.16)] px-1 opacity-40">
-                <div className="size-6 rounded-full bg-white" />
-              </div>
+              <span className="ml-2 shrink-0 rounded-full bg-[rgba(251,251,251,0.10)] px-2 py-1 text-[10px] font-bold leading-none text-[rgba(251,251,251,0.7)]">
+                {Math.min(selections.length, buttonProgressionConfig.maxSelections)}/
+                {buttonProgressionConfig.maxSelections}
+              </span>
             </div>
 
-            <div className="mx-3 h-px bg-[rgba(251,251,251,0.16)]" />
+            <div className="flex flex-col gap-1 px-2 pb-2">
+              {progressionRows.map((row) => {
+                const isCurrent = selections.length === row.count;
+                const isComplete = selections.length > row.count;
+                const isReachable = selections.length >= row.count;
+                const fillPct = Math.min(100, (selections.length / row.count) * 100);
+                return (
+                  <div
+                    key={row.count}
+                    className={`grid grid-cols-[34px_1fr_58px_64px] items-center gap-2 rounded-[10px] px-2 py-1.5 transition-colors ${
+                      isCurrent
+                        ? 'bg-[rgba(151,48,255,0.18)]'
+                        : isComplete
+                          ? 'bg-[rgba(251,251,251,0.07)]'
+                          : 'bg-transparent'
+                    }`}
+                  >
+                    <div
+                      className={`flex h-7 w-8 items-center justify-center rounded-full text-[12px] font-black leading-none ${
+                        isCurrent
+                          ? 'bg-[#4b20ff] text-[#fbfbfb]'
+                          : isComplete
+                            ? 'bg-[rgba(251,251,251,0.16)] text-[#fbfbfb]'
+                            : 'bg-[rgba(251,251,251,0.08)] text-[rgba(251,251,251,0.5)]'
+                      }`}
+                    >
+                      {row.count}
+                    </div>
 
-            {/* Booster */}
-            <div className="flex items-center gap-2 px-3 py-2">
-              <div
-                className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[12px] p-1"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(50deg, #ffa65b 0%, #f0abfc 100%)',
-                }}
-              >
-                <img src={boosterIllus} alt="" className="size-7 object-contain" />
-              </div>
-              <div className="flex min-w-px flex-1 flex-col">
-                <div className="flex items-center gap-0.5">
-                  <span className="text-[14px] font-bold leading-[21px] text-[#fbfbfb]">
-                    Booster 20%
-                  </span>
-                  <img
-                    src={chevronRightIcon}
-                    alt=""
-                    className="size-[18px] rotate-90 opacity-70"
-                  />
-                </div>
-                <div className="flex h-5 items-center gap-1 self-start rounded-[12px] bg-[rgba(251,251,251,0.12)] px-1">
-                  <img src={clockIcon} alt="" className="size-3" />
-                  <span className="text-[12px] font-medium leading-4 text-[#fbfbfb]">
-                    23h<span className="text-[rgba(251,251,251,0.7)]">:</span>23m
-                    <span className="text-[rgba(251,251,251,0.7)]">:</span>23s
-                  </span>
-                </div>
-              </div>
-              {/* toggle — off */}
-              <div className="flex h-8 w-[52px] shrink-0 items-center rounded-full bg-[rgba(251,251,251,0.16)] px-1">
-                <div className="size-6 rounded-full bg-white" />
-              </div>
+                    <div className="min-w-0">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-[11px] font-bold leading-4 text-[rgba(251,251,251,0.72)]">
+                          {row.count} selecciones
+                        </span>
+                        {isCurrent && (
+                          <span className="shrink-0 text-[10px] font-black uppercase leading-none text-[#fbbf24]">
+                            actual
+                          </span>
+                        )}
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[rgba(251,251,251,0.10)]">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${isReachable ? 100 : fillPct}%`,
+                            backgroundImage: isReachable
+                              ? 'linear-gradient(75deg, #4b20ff 0%, #9730ff 100%)'
+                              : 'linear-gradient(75deg, rgba(251,251,251,0.24) 0%, rgba(251,251,251,0.14) 100%)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-medium uppercase leading-3 text-[rgba(251,251,251,0.42)]">
+                        Monto
+                      </span>
+                      <span className="text-[12px] font-bold leading-4 text-[#fbfbfb]">
+                        ${row.amount}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-medium uppercase leading-3 text-[rgba(251,251,251,0.42)]">
+                        Gana
+                      </span>
+                      <span className="text-[12px] font-bold leading-4 text-[#fbbf24]">
+                        ${row.potentialWin}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -548,7 +563,7 @@ export function BetSlipFullSheet({
               opened at exactly 1 selection (tapping the pill). */}
           {!canConfirm && (
             <p className="px-3.5 text-center text-[13px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
-              Agrega al menos 2 selecciones para crear tu apuesta.
+              Agrega al menos 2 selecciones para continuar.
             </p>
           )}
 

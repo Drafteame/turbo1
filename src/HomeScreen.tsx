@@ -352,6 +352,7 @@ function MatchTabsRow() {
               </button>
             );
           }
+          if (!('home' in t)) return null;
           // Two-line match tab (teams + date/time).
           return (
             <button
@@ -477,6 +478,34 @@ function splitKickoff(matchTime: string): { date: string; time: string } {
   return { date: date.toUpperCase(), time: rest.join(' ') };
 }
 
+type ProbabilityTag = {
+  label: 'Fácil' | 'Moderado' | 'Difícil';
+  level: 1 | 2 | 3;
+  activeClassName: string;
+};
+
+function probabilityTagForOdds(odds: number): ProbabilityTag {
+  if (odds <= 1.75) {
+    return {
+      label: 'Fácil',
+      level: 1,
+      activeClassName: 'bg-[#d2ff72] shadow-[0_0_8px_rgba(210,255,114,0.36)]',
+    };
+  }
+  if (odds <= 2.2) {
+    return {
+      label: 'Moderado',
+      level: 2,
+      activeClassName: 'bg-[#fbbf24] shadow-[0_0_8px_rgba(251,191,36,0.32)]',
+    };
+  }
+  return {
+    label: 'Difícil',
+    level: 3,
+    activeClassName: 'bg-[#b18bff] shadow-[0_0_8px_rgba(177,139,255,0.34)]',
+  };
+}
+
 /** One player's card worth of data: the shared match/threshold context plus
     whichever of Más/Menos this player carries (see MOCK_PICKS — some players
     only have one side, some have both). Grouped by `groupId` so the pair
@@ -565,6 +594,42 @@ function MarketAccordion({
       {/* Body — 2×2 grid of player-prop cards + Ver todos CTA */}
       {isOpen && (
         <div className="flex flex-col gap-1 pt-1">
+          <div className="mb-1 flex items-center justify-between rounded-[12px] bg-[rgba(251,251,251,0.06)] px-2.5 py-2">
+            <span
+              className="text-[11px] font-bold leading-4 text-[rgba(251,251,251,0.62)]"
+              style={{ fontFamily: 'Red Hat Display, sans-serif' }}
+            >
+              Dificultad
+            </span>
+            <div className="flex items-center gap-2.5">
+              {[
+                { label: 'Fácil', level: 1, activeClassName: 'bg-[#d2ff72]' },
+                { label: 'Medio', level: 2, activeClassName: 'bg-[#fbbf24]' },
+                { label: 'Difícil', level: 3, activeClassName: 'bg-[#b18bff]' },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-1">
+                  <span className="flex items-center gap-0.5" aria-hidden>
+                    {[1, 2, 3].map((dot) => (
+                      <span
+                        key={dot}
+                        className={`size-1.5 rounded-full ${
+                          dot <= item.level
+                            ? item.activeClassName
+                            : 'bg-[rgba(251,251,251,0.18)]'
+                        }`}
+                      />
+                    ))}
+                  </span>
+                  <span
+                    className="text-[10px] font-medium leading-none text-[rgba(251,251,251,0.55)]"
+                    style={{ fontFamily: 'Red Hat Display, sans-serif' }}
+                  >
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             {playerGroups.map((g) => {
               const { date, time } = splitKickoff(g.matchTime);
@@ -667,9 +732,10 @@ function MarketAccordion({
                       Hold progress renders only in the floating pill
                       (OneClickBetPill.tsx) — these stay `qb-hold` only for
                       the touch-action rule. */}
-                  <div className="flex h-11 w-full items-center gap-[1.5px]">
+                  <div className="flex h-[62px] w-full items-center gap-[1.5px]">
                     {options.map(({ key, label, sel }, i) => {
                       const selected = selectedIds.has(sel.id);
+                      const tag = probabilityTagForOdds(sel.odds);
                       const corners =
                         options.length === 1
                           ? 'rounded-xl'
@@ -682,7 +748,8 @@ function MarketAccordion({
                           type="button"
                           {...bindPick(sel)}
                           aria-pressed={selected}
-                          className={`qb-hold qb-press flex h-11 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 overflow-hidden border px-2 py-1 transition-all duration-200 active:scale-[0.96] ${corners} ${
+                          aria-label={`${label}, ${g.threshold}, dificultad ${tag.label}`}
+                          className={`qb-hold qb-press flex h-[62px] min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 overflow-hidden border px-2 py-1.5 transition-all duration-200 active:scale-[0.96] ${corners} ${
                             selected
                               ? 'border-[#d2ff72] bg-gradient-to-b from-[rgba(210,255,114,0.16)] to-[rgba(86,222,234,0.16)]'
                               : 'border-[rgba(251,251,251,0.08)] bg-[rgba(251,251,251,0.12)]'
@@ -709,6 +776,22 @@ function MarketAccordion({
                             >
                               {g.threshold}
                             </span>
+                          </span>
+                          <span
+                            className="flex items-center gap-1"
+                            aria-hidden
+                            title={`Dificultad: ${tag.label}`}
+                          >
+                            {[1, 2, 3].map((dot) => (
+                              <span
+                                key={dot}
+                                className={`size-1.5 rounded-full ${
+                                  dot <= tag.level
+                                    ? tag.activeClassName
+                                    : 'bg-[rgba(251,251,251,0.18)]'
+                                }`}
+                              />
+                            ))}
                           </span>
                         </button>
                       );
@@ -777,9 +860,9 @@ function NavbarImpl({
   const tabs: Array<{
     id: 'bets' | 'entradas' | 'gaming' | 'rewards';
     label: string;
-    icon: string | null;
+    icon: string;
   }> = [
-    { id: 'bets', label: 'Bets', icon: betsIcon },
+    { id: 'bets', label: 'Turbo', icon: betsIcon },
     { id: 'entradas', label: 'Mis entradas', icon: misEntradasIcon },
     { id: 'gaming', label: 'Gaming', icon: gamingIcon },
     { id: 'rewards', label: 'Rewards', icon: rewardsIcon },

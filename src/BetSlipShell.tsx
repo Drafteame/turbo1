@@ -44,9 +44,11 @@ export function BetSlipShell({ bouncy, onMounted, children }: Props) {
   const [isPresent, safeToRemove] = usePresence();
 
   // Own motion values so we can read y for velocity-derived squash.
-  const y = useMotionValue(bouncy ? cfg.entry.fromY : cfg.entry.toY);
-  const scale = useMotionValue(bouncy ? cfg.entry.fromScale : cfg.entry.toScale);
-  const opacity = useMotionValue(
+  const y = useMotionValue<number>(bouncy ? cfg.entry.fromY : cfg.entry.toY);
+  const scale = useMotionValue<number>(
+    bouncy ? cfg.entry.fromScale : cfg.entry.toScale,
+  );
+  const opacity = useMotionValue<number>(
     bouncy ? cfg.entry.fromOpacity : cfg.entry.toOpacity,
   );
 
@@ -127,7 +129,11 @@ export function BetSlipShell({ bouncy, onMounted, children }: Props) {
       duration: cfg.exit.opacityDurationMs / 1000,
     });
     let done = false;
-    Promise.all([a1.then(), a2.then(), a3.then()]).then(() => {
+    Promise.all([
+      a1.then(() => undefined),
+      a2.then(() => undefined),
+      a3.then(() => undefined),
+    ]).then(() => {
       if (done) return;
       done = true;
       safeToRemove?.();

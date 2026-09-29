@@ -15,7 +15,10 @@ import {
   canConfirmEntry,
   getSlipEntryValues,
 } from './buttonProgressionConfig';
-import { ButtonPreviewMomios } from './ButtonPreviewMomios';
+import {
+  ButtonPreviewMomios,
+  type ButtonLiveState,
+} from './ButtonPreviewMomios';
 import { SwipeToConfirm } from './SwipeToConfirm';
 import type { Selection } from './types';
 
@@ -120,6 +123,7 @@ type Props = {
   onKeepAlive: () => void;
   /** Parlay "Lista" tab — opens the full-screen summary sheet. */
   onOpenList: () => void;
+  onLiveState?: (s: ButtonLiveState) => void;
 };
 
 export function BetSlipSheet({
@@ -132,6 +136,7 @@ export function BetSlipSheet({
   onConfirm,
   onKeepAlive,
   onOpenList,
+  onLiveState,
 }: Props) {
   // Entry amount + potential winnings come from the centralized
   // selection-count config, not from odds (see buttonProgressionConfig's
@@ -163,7 +168,7 @@ export function BetSlipSheet({
     const a1 = animate(y, 260, { duration: 0.25, ease: [0.7, 0, 0.84, 0] });
     const a2 = animate(opacity, 0, { duration: 0.2 });
     let done = false;
-    Promise.all([a1.then(), a2.then()]).then(() => {
+    Promise.all([a1.then(() => undefined), a2.then(() => undefined)]).then(() => {
       if (done) return;
       done = true;
       safeToRemove?.();
@@ -420,6 +425,7 @@ export function BetSlipSheet({
             cumulativeOdds={cumulativeOdds}
             speedScale={1}
             tier3OddsEffect={buttonProgressionConfig.tier3OddsEffect}
+            onLiveState={onLiveState}
           />
         </motion.div>
 
@@ -573,7 +579,7 @@ export function BetSlipSheet({
               collapses this content). */}
           {!canConfirm && (
             <p className="px-[10px] pt-2 text-center text-[12px] font-medium leading-4 text-[rgba(251,251,251,0.5)]">
-              Agrega al menos 2 selecciones para crear tu apuesta.
+              Agrega al menos 2 selecciones para continuar.
             </p>
           )}
 

@@ -141,10 +141,6 @@ export function App() {
   const [tier3OddsEffect, setTier3OddsEffect] = useState<
     'flames' | 'smoke'
   >(buttonProgressionConfig.tier3OddsEffect);
-  // PASS 3 — "Bouncy entry only on FIRST mount per session". Once the bet
-  // slip has mounted (and started its bounce) once, this flips to true and
-  // subsequent 0 → 1 transitions skip the bounce.
-  const hasBouncedOnceRef = useRef(false);
 
   // Bet-slip view state. The summarized purple-glass expand (BetSlipSheet's
   // `expanded` state) is retired — the slip only ever shows as the collapsed
@@ -218,10 +214,6 @@ export function App() {
     return () => clearTimeout(t);
   }, [entryCount]);
 
-  const selectedIds = useMemo(
-    () => new Set(selections.map((s) => s.id)),
-    [selections],
-  );
   const cumulativeOdds = useMemo(
     () => computeCumulativeOdds(selections),
     [selections],
@@ -229,10 +221,6 @@ export function App() {
   const tier: Tier = tierForOdds(cumulativeOdds);
 
   /* ---------- handlers ---------- */
-  // REGRESSION FIX — removed `queueMicrotask` ref-flipping from setSelections
-  // updaters. The microtask was firing BEFORE React re-rendered with the new
-  // state, so BetSlipShell mounted with bouncy=false on its very first mount.
-  // The ref is now flipped via BetSlipShell's onMounted callback (below).
   const addRandom = useCallback(() => {
     if (selections.length >= buttonProgressionConfig.maxSelections) return;
     // Skip options already selected AND options whose Más/Menos sibling is
@@ -646,7 +634,7 @@ export function App() {
               {debug && (
                 <div className="mx-3 mb-2 mt-3 rounded-xl border border-[#4b20ff]/40 bg-[#4b20ff]/10 p-3">
                   <div className="mb-2 text-[11px] font-bold text-[#b18bff]">
-                    DEBUG · one click bet pill
+                    DEBUG · Turbo pill
                   </div>
                   <div className="mb-1.5 grid grid-cols-2 gap-1.5">
                     <button
@@ -660,7 +648,7 @@ export function App() {
                           : 'bg-white/10 text-white'
                       }`}
                     >
-                      Bet-slip pill
+                      Turbo pill
                     </button>
                     <button
                       onClick={() => {
@@ -725,13 +713,13 @@ export function App() {
                     disabled={selections.length === 0}
                     className="mb-1.5 w-full rounded-md bg-white/10 px-2 py-1.5 text-[11px] font-bold text-white disabled:opacity-30"
                   >
-                    ▶ Transition: bet slip → One Click Bet
+                    ▶ Transition: Turbo pill
                   </button>
                   <button
                     onClick={() => setDebugOcbState('hidden')}
                     className="w-full rounded-md bg-white/10 px-2 py-1.5 text-[11px] font-bold text-white"
                   >
-                    ◀ Restore previous bet slip
+                    ◀ Restore previous Turbo pill
                   </button>
                 </div>
               )}
@@ -884,6 +872,7 @@ export function App() {
                           onConfirm={confirmBet}
                           onKeepAlive={() => {}}
                           onOpenList={() => setListOpen(true)}
+                          onLiveState={setLive}
                         />
                       )}
                     </AnimatePresence>
@@ -906,7 +895,7 @@ export function App() {
                         odds={ocbOdds}
                         state={ocbPillState}
                         progress={ocbPillProgress}
-                        reducedMotion={osReducedMotion}
+                        reducedMotion={Boolean(osReducedMotion)}
                       />
                     </div>
                   )}

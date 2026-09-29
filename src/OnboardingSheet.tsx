@@ -10,7 +10,6 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import checkboxCheckIcon from './assets/checkbox-check.svg';
 import closeIcon from './assets/close.svg';
-import successCheckIcon from './assets/success-check.png';
 import { TicketFace } from './EntryCreatedOverlay';
 
 /**
@@ -507,7 +506,7 @@ export function OnboardingSheet({
               </ol>
               <div className="flex flex-col gap-2.5">
                 <p className="text-[14px] font-medium leading-[21px] text-[rgba(251,251,251,0.7)]">
-                  Este cambio solo aplica para este tipo de apuestas.
+                  Este cambio solo aplica para este tipo de selecciones.
                 </p>
                 <label
                   htmlFor="quick-bet-odds-checkbox"

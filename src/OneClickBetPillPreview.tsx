@@ -18,7 +18,7 @@ export function OneClickBetPillPreview() {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#0a0a0a] px-4 py-6">
       <h1 className="mb-1 text-[14px] font-black leading-[18px] text-[#fbfbfb]">
-        OneClickBetPill — isolated preview
+        Turbo pill — isolated preview
       </h1>
       <p className="mb-5 text-[11px] font-medium text-[rgba(251,251,251,0.5)]">
         Resize the browser to 320px / 390px to check both target viewports.
