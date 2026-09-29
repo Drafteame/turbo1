@@ -559,6 +559,13 @@ export function BetSlipFullSheet({
               below the 2-selection minimum. */}
           <div data-scroll>
             <SwipeToConfirm
+              // Keyed on the current selection set so a genuinely NEW slip
+              // (different picks — always true right after an entry is
+              // confirmed and the user builds another) always gets a fresh
+              // SwipeToConfirm instance, discarding any previous
+              // confirming/thumb-position state instead of risking it
+              // leaking into the next entry attempt.
+              key={selections.map((s) => s.id).join('|')}
               stake={amount}
               onConfirm={onConfirm}
               heightPx={44}

@@ -307,12 +307,16 @@ export function App() {
   // green overlay via `success`). The overlay's onDone finishes the sequence.
   // Guarded here too (not just in the UI, which already disables the swipe
   // track below `minSelections`) — see buttonProgressionConfig's
-  // `canConfirmEntry`.
+  // `canConfirmEntry`. Also guarded against `success` already being true:
+  // an entry is created by exactly one completed swipe, so while one is
+  // already mid-creation/animation, a second call (a duplicate tap, or a
+  // stray callback) must be a no-op rather than starting another entry.
   const confirmBet = useCallback(() => {
+    if (success) return;
     if (!canConfirmEntry(selections.length)) return;
     setListOpen(false);
     setSuccess(true);
-  }, [selections.length]);
+  }, [selections.length, success]);
 
   // Fired when the green ticket has flown into Mis entradas — settles the
   // entry (badge bump, count) and returns to idle. Only the real

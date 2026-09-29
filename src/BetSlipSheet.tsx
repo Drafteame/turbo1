@@ -577,12 +577,13 @@ export function BetSlipSheet({
             </p>
           )}
 
-          {/* Swipe to confirm — shared component (remounts on collapse via key
-              so its swipe/loader state resets). Disabled below the
-              2-selection minimum. */}
+          {/* Swipe to confirm — shared component. Keyed on expanded state AND
+              the current selection set so it remounts (resetting any
+              swipe/confirming/loader state) both on collapse and whenever
+              a new slip's picks differ from whatever was last confirmed. */}
           <div className="flex w-full flex-col px-[10px] pb-[10px] pt-2">
             <SwipeToConfirm
-              key={expanded ? 'expanded' : 'collapsed'}
+              key={`${expanded ? 'expanded' : 'collapsed'}:${selections.map((s) => s.id).join('|')}`}
               stake={amount}
               onConfirm={onConfirm}
               onSwipeStart={onKeepAlive}

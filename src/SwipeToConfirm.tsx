@@ -65,6 +65,7 @@ export function SwipeToConfirm({
   };
 
   const handleThumbDragEnd = () => {
+    if (disabled || confirming) return;
     const maxX = maxThumbX();
     if (swipeX.get() >= maxX - CONFIRM_END_TOLERANCE_PX) {
       setConfirming(true);
@@ -76,11 +77,32 @@ export function SwipeToConfirm({
     }
   };
 
+  // `onConfirm` is read from a ref inside the timer, not from the effect's
+  // closure — App.tsx's confirmBet is a useCallback keyed on
+  // selections.length, so its identity changes every time a selection is
+  // added/removed. If the effect depended on `onConfirm` directly, a stale
+  // `confirming: true` (e.g. from an instance that didn't get torn down
+  // between one entry and the next) would re-run the effect on every such
+  // change and re-arm a fresh confirm timer WITHOUT any new swipe — silently
+  // creating another entry. Depending on `confirming` alone means the timer
+  // can only ever be armed by handleThumbDragEnd, i.e. an actual completed
+  // drag.
+  const onConfirmRef = useRef(onConfirm);
+  useEffect(() => {
+    onConfirmRef.current = onConfirm;
+  }, [onConfirm]);
+
   useEffect(() => {
     if (!confirming) return;
-    const t = setTimeout(onConfirm, CONFIRM_LOADER_MS);
+    const t = setTimeout(() => {
+      // Reset before firing so this instance can't be left holding a stale
+      // `confirming: true` for a future swipe/entry to accidentally reuse.
+      setConfirming(false);
+      swipeX.set(0);
+      onConfirmRef.current();
+    }, CONFIRM_LOADER_MS);
     return () => clearTimeout(t);
-  }, [confirming, onConfirm]);
+  }, [confirming]);
 
   return (
     <div
